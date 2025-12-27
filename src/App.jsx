@@ -5,7 +5,7 @@ import {
   Shield, Key, Braces, Code2, Hash, Fingerprint, 
   Search, ShieldOff, Wifi, WifiOff, Github, 
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
-  Palette, Check, ShieldCheck
+  Palette, Check, ShieldCheck, Download, Smartphone
 } from 'lucide-react'
 
 // Import components
@@ -243,7 +243,7 @@ const toolDescriptions = {
 }
 
 // Sidebar component
-const Sidebar = ({ isOpen, setIsOpen }) => {
+const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, setDeferredPrompt, isInstalled }) => {
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef(null)
@@ -382,8 +382,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           )}
         </nav>
 
-        {/* Dev Mode Toggle */}
-        <div className="p-4 border-t border-[var(--border-color)]">
+        {/* Install App & Dev Mode Toggle */}
+        <div className="p-4 border-t border-[var(--border-color)] space-y-2">
+          <InstallButton 
+            deferredPrompt={deferredPrompt}
+            setDeferredPrompt={setDeferredPrompt}
+            isInstalled={isInstalled}
+          />
           <DevModeToggle />
         </div>
       </motion.aside>
@@ -411,8 +416,121 @@ const DevModeToggle = () => {
   )
 }
 
+// PWA Install Button (Sidebar version)
+const InstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
+  const { showToast } = useApp()
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      // Show instructions for manual installation
+      showToast('Use browser menu → "Install App" or "Add to Home Screen"')
+      return
+    }
+
+    // Show the install prompt
+    deferredPrompt.prompt()
+    
+    // Wait for the user to respond
+    const { outcome } = await deferredPrompt.userChoice
+    
+    if (outcome === 'accepted') {
+      showToast('OffGrid installed successfully!')
+    }
+    
+    // Clear the deferred prompt
+    setDeferredPrompt(null)
+  }
+
+  // Show installed state
+  if (isInstalled) {
+    return (
+      <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <Smartphone className="w-4 h-4" />
+        <span className="text-sm">App Installed</span>
+        <Check className="w-4 h-4 ml-auto" />
+      </div>
+    )
+  }
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={handleInstall}
+      className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 ${
+        deferredPrompt 
+          ? 'bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 hover:from-[var(--accent)]/30 hover:to-purple-500/30 border border-[var(--accent)]/30'
+          : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/10 border border-[var(--border-color)]'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Download className={`w-4 h-4 ${deferredPrompt ? 'accent-text' : 'text-[var(--text-tertiary)]'}`} />
+        <span className={`text-sm ${deferredPrompt ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+          Install App
+        </span>
+      </div>
+      <div className={`text-[10px] px-2 py-0.5 rounded-full ${
+        deferredPrompt 
+          ? 'bg-[var(--accent)]/20 accent-text' 
+          : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]'
+      }`}>
+        PWA
+      </div>
+    </motion.button>
+  )
+}
+
+// Header Install Button (compact version)
+const HeaderInstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
+  const { showToast } = useApp()
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      // Show instructions for manual installation
+      showToast('Use browser menu → "Install App" or "Add to Home Screen"')
+      return
+    }
+
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    
+    if (outcome === 'accepted') {
+      showToast('OffGrid installed successfully!')
+    }
+    
+    setDeferredPrompt(null)
+  }
+
+  // If already installed, show a badge
+  if (isInstalled) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+        <Smartphone className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Installed</span>
+      </div>
+    )
+  }
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      onClick={handleInstall}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+        deferredPrompt 
+          ? 'bg-gradient-to-r from-[var(--accent)] to-purple-500 text-white hover:opacity-90' 
+          : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]/20'
+      }`}
+      title={deferredPrompt ? "Install OffGrid as an app" : "Click for install instructions"}
+    >
+      <Download className="w-3.5 h-3.5" />
+      <span className="hidden sm:inline">Install</span>
+    </motion.button>
+  )
+}
+
 // Header component
-const Header = ({ setIsOpen, theme, setTheme, accent, setAccent }) => {
+const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt, setDeferredPrompt, isInstalled }) => {
   const { isOnline } = useApp()
 
   return (
@@ -428,6 +546,13 @@ const Header = ({ setIsOpen, theme, setTheme, accent, setAccent }) => {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
+          {/* Install App Button */}
+          <HeaderInstallButton 
+            deferredPrompt={deferredPrompt}
+            setDeferredPrompt={setDeferredPrompt}
+            isInstalled={isInstalled}
+          />
+
           {/* Online/Offline indicator */}
           <div className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full ${
             isOnline 
@@ -488,6 +613,10 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [toast, setToast] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  
+  // PWA Install state
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [isInstalled, setIsInstalled] = useState(false)
 
   // Handle boot complete
   const handleBootComplete = () => {
@@ -524,6 +653,35 @@ function App() {
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  // PWA Install prompt
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true)
+    }
+
+    const handleBeforeInstall = (e) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault()
+      // Store the event for later use
+      setDeferredPrompt(e)
+    }
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true)
+      setDeferredPrompt(null)
+      showToast('OffGrid has been installed!')
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+      window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [])
 
@@ -591,7 +749,13 @@ function App() {
           className="min-h-screen mesh-bg"
         >
           <div className="flex">
-            <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+            <Sidebar 
+              isOpen={sidebarOpen} 
+              setIsOpen={setSidebarOpen}
+              deferredPrompt={deferredPrompt}
+              setDeferredPrompt={setDeferredPrompt}
+              isInstalled={isInstalled}
+            />
             
             <div className="flex-1 flex flex-col min-h-screen">
               <Header 
@@ -600,6 +764,9 @@ function App() {
                 setTheme={setTheme}
                 accent={accent}
                 setAccent={setAccent}
+                deferredPrompt={deferredPrompt}
+                setDeferredPrompt={setDeferredPrompt}
+                isInstalled={isInstalled}
               />
               
               <main className="flex-1 p-4 lg:p-6 relative z-0">
