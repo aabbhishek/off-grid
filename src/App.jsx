@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext, useRef } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -232,9 +232,52 @@ const navItems = [
   { path: '/uuid', label: 'UUID Generator', icon: Fingerprint, shortcut: '5' },
 ]
 
+// Tool descriptions for search
+const toolDescriptions = {
+  '/': ['home', 'landing', 'start', 'main'],
+  '/jwt': ['jwt', 'token', 'decode', 'json web token', 'authentication', 'auth', 'bearer'],
+  '/json': ['json', 'format', 'formatter', 'beautify', 'validate', 'parse', 'tree', 'diff'],
+  '/encode': ['encode', 'decode', 'base64', 'url', 'html', 'entity', 'hex', 'binary', 'unicode'],
+  '/hash': ['hash', 'md5', 'sha', 'sha256', 'sha512', 'checksum', 'digest', 'crypto'],
+  '/uuid': ['uuid', 'guid', 'unique', 'id', 'identifier', 'v4', 'v7', 'generate'],
+}
+
 // Sidebar component
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation()
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef(null)
+
+  // Filter navItems based on search query
+  const filteredNavItems = navItems.filter((item) => {
+    if (!searchQuery.trim()) return true
+    
+    const query = searchQuery.toLowerCase().trim()
+    const label = item.label.toLowerCase()
+    const descriptions = toolDescriptions[item.path] || []
+    
+    return (
+      label.includes(query) ||
+      descriptions.some(desc => desc.includes(query))
+    )
+  })
+
+  // Handle keyboard shortcut for search (/)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearchQuery('')
+        searchInputRef.current?.blur()
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <>
@@ -285,36 +328,58 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search tools... (/)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="glass-input pl-10 py-2.5 text-sm"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 pb-4 overflow-y-auto">
           <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] px-3 mb-2 font-medium">
-            Tools
+            {searchQuery ? `Results (${filteredNavItems.length})` : 'Tools'}
           </div>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={() => setIsOpen(false)}
-              className={({ isActive }) => 
-                `nav-link mb-1 ${isActive ? 'active' : ''}`
-              }
-            >
-              <item.icon className="w-4 h-4" />
-              <span className="flex-1 text-sm">{item.label}</span>
-              {item.shortcut && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
-                  {item.shortcut}
-                </span>
-              )}
-            </NavLink>
-          ))}
+          {filteredNavItems.length > 0 ? (
+            filteredNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => {
+                  setIsOpen(false)
+                  setSearchQuery('')
+                }}
+                className={({ isActive }) => 
+                  `nav-link mb-1 ${isActive ? 'active' : ''}`
+                }
+              >
+                <item.icon className="w-4 h-4" />
+                <span className="flex-1 text-sm">{item.label}</span>
+                {item.shortcut && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
+                    {item.shortcut}
+                  </span>
+                )}
+              </NavLink>
+            ))
+          ) : (
+            <div className="px-3 py-8 text-center text-[var(--text-tertiary)]">
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No tools found</p>
+              <p className="text-xs mt-1">Try a different search term</p>
+            </div>
+          )}
         </nav>
 
         {/* Dev Mode Toggle */}
