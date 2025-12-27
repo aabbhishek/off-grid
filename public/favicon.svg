@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#00d4ff" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="100" height="100" rx="22" fill="#0a0a14"/>
+  
+  <!-- Shield shape -->
+  <g filter="url(#glow)">
+    <path d="M50 15 L75 25 L75 50 C75 67 63 80 50 85 C37 80 25 67 25 50 L25 25 Z" 
+          fill="url(#shieldGrad)" 
+          stroke="rgba(255,255,255,0.2)" 
+          stroke-width="1"/>
+  </g>
+  
+  <!-- Checkmark inside shield -->
+  <path d="M38 48 L46 56 L62 40" 
+        fill="none" 
+        stroke="white" 
+        stroke-width="5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  
+  <!-- WiFi off indicator (small circle bottom right) -->
+  <circle cx="72" cy="72" r="14" fill="#0a0a14" stroke="#10b981" stroke-width="2"/>
+  <g transform="translate(72, 72)">
+    <!-- WiFi off symbol -->
+    <line x1="-5" y1="-5" x2="5" y2="5" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-4 -2 Q0 -6 4 -2" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="0" cy="3" r="1.5" fill="#10b981"/>
+  </g>
+</svg>

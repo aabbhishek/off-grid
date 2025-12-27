@@ -1,0 +1,108 @@
+name: Deploy React App to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+        env:
+          CI: false  # Prevents treating warnings as errors
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+      # Auto Release Creation
+      - name: Get package version
+        id: package_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          git log --pretty=format:"- %s (%h)" -10 >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## Deployment Info" >> $GITHUB_OUTPUT
+          echo "- **Deployed to:** https://aabbhishek.github.io/off-grid" >> $GITHUB_OUTPUT
+          echo "- **Build Date:** ${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
+          echo "- **Node Version:** 20" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## Features" >> $GITHUB_OUTPUT
+          echo "- 🔑 JWT Decoder - Decode and verify JSON Web Tokens" >> $GITHUB_OUTPUT
+          echo "- 📋 JSON Formatter - Format, validate, and compare JSON" >> $GITHUB_OUTPUT
+          echo "- 🔄 Encode/Decode - Base64, URL, HTML entities, and more" >> $GITHUB_OUTPUT
+          echo "- #️⃣ Hash Generator - MD5, SHA-1, SHA-256, SHA-384, SHA-512" >> $GITHUB_OUTPUT
+          echo "- 🆔 UUID Generator - Generate UUIDs v1, v4, and v7" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## Privacy" >> $GITHUB_OUTPUT
+          echo "🛡️ All processing happens locally in your browser. No data is ever transmitted to any server." >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.package_version.outputs.version }}-${{ github.run_number }}
+          name: Release v${{ steps.package_version.outputs.version }} (Build #${{ github.run_number }})
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create ZIP artifact
+        run: |
+          cd dist
+          zip -r ../offgrid-v${{ steps.package_version.outputs.version }}.zip .
+          cd ..
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.package_version.outputs.version }}-${{ github.run_number }}
+          files: offgrid-v${{ steps.package_version.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

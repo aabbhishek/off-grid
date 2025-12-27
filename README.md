@@ -1,70 +1,148 @@
-# Getting Started with Create React App
+# OffGrid — Privacy-First Developer Toolkit
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+<p align="center">
+  <img src="public/favicon.svg" alt="OffGrid Logo" width="100" height="100">
+</p>
 
-## Available Scripts
+<p align="center">
+  <strong>Your data stays off the grid, off the network, off any server.</strong>
+</p>
 
-In the project directory, you can run:
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#privacy">Privacy</a>
+</p>
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🛡️ Privacy Guarantees
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **Zero Data Transmission**: All processing happens in your browser
+- **No Analytics or Tracking**: No cookies, no fingerprinting, no third-party scripts
+- **Works Offline**: Install as PWA and use without internet
+- **Open Source**: Verify the code yourself
 
-### `npm test`
+## ✨ Features
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 🔑 JWT Decoder
+- Decode and inspect JSON Web Tokens
+- View header, payload, and signature
+- Real-time expiry status
+- Signature verification (HS256)
+- Security warnings for vulnerable configurations
 
-### `npm run build`
+### 📋 JSON Formatter
+- Pretty print with customizable indentation
+- Interactive tree view
+- JSON diff comparison
+- Path queries (dot notation)
+- TypeScript interface inference (Dev Mode)
+- Stats and metrics
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 🔄 Encode/Decode
+- Base64 (standard and URL-safe)
+- URL encoding (percent-encoding)
+- HTML entities
+- Unicode escape sequences
+- Hexadecimal
+- Binary
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### #️⃣ Hash Generator
+- MD5 (pure JavaScript implementation)
+- SHA-1, SHA-256, SHA-384, SHA-512
+- Text and file input
+- Hash comparison/verification
+- Multiple output formats
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 🆔 UUID Generator
+- UUID v4 (random)
+- UUID v7 (timestamp + random, sortable)
+- UUID v1 (timestamp-based)
+- Batch generation (up to 1000)
+- UUID validation and parsing
+- Multiple output formats
 
-### `npm run eject`
+## 🚀 Installation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/offgrid.git
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Navigate to the project
+cd offgrid
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Install dependencies
+npm install
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+# Start development server
+npm run dev
+```
 
-## Learn More
+## 📦 Build
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+# Build for production
+npm run build
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+# Preview production build
+npm run preview
+```
 
-### Code Splitting
+## 🎮 Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Keyboard Shortcuts
 
-### Analyzing the Bundle Size
+| Key | Action |
+|-----|--------|
+| `1-5` | Switch between tools |
+| `D` | Toggle Dev Mode |
+| `/` | Focus search |
+| `Ctrl+V` | Paste and process |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Dev Mode
 
-### Making a Progressive Web App
+Toggle Dev Mode (press `D` or use sidebar toggle) to reveal:
+- Detailed algorithm explanations
+- Byte-level analysis
+- Performance metrics
+- TypeScript inference
+- Internal process visualization
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 🔒 Privacy
 
-### Advanced Configuration
+OffGrid is designed with privacy as the core principle:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+1. **Client-Side Only**: All operations run in your browser using Web APIs
+2. **No Network Requests**: After initial load, no data leaves your device
+3. **No Storage**: We don't use cookies or collect any data
+4. **PWA Support**: Install and use completely offline
+5. **Open Source**: Audit the code yourself
 
-### Deployment
+## 🛠️ Tech Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- **React 18** - UI framework
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Framer Motion** - Animations
+- **Lucide React** - Icons
+- **Web Crypto API** - Cryptographic operations
 
-### `npm run build` fails to minify
+## 🎨 Design
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- **Glassmorphic UI** with backdrop blur effects
+- **Terminal Green** color scheme (#00ff00)
+- **Dark theme** optimized for developer comfort
+- **Responsive** design for all screen sizes
+- **Accessible** with keyboard navigation and ARIA labels
+
+## 📄 License
+
+MIT License - feel free to use, modify, and distribute.
+
+---
+
+<p align="center">
+  Made with 💚 for developers who value their privacy
+</p>
