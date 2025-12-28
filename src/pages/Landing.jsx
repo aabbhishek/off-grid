@@ -46,6 +46,14 @@ const tools = [
     icon: Fingerprint,
     color: 'from-indigo-500 to-purple-500',
     features: ['UUID v4 (random)', 'UUID v7 (timestamp)', 'Batch generation', 'Multiple formats']
+  },
+  {
+    path: '/ssl',
+    name: 'SSL/TLS Toolkit',
+    description: 'Parse certificates, build chains, generate CSRs',
+    icon: Lock,
+    color: 'from-rose-500 to-pink-500',
+    features: ['Certificate decoder', 'Chain builder', 'CSR generator', 'Key parser']
   }
 ]
 

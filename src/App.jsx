@@ -6,7 +6,8 @@ import {
   Search, ShieldOff, Wifi, WifiOff, Github, 
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
   Palette, Check, ShieldCheck, Download, Smartphone,
-  Monitor, Share2, MoreVertical, Plus, ExternalLink
+  Monitor, Share2, MoreVertical, Plus, ExternalLink,
+  Lock
 } from 'lucide-react'
 
 // Import components
@@ -19,6 +20,7 @@ import JSONFormatter from './pages/JSONFormatter'
 import EncodeDecode from './pages/EncodeDecode'
 import HashGenerator from './pages/HashGenerator'
 import UUIDGenerator from './pages/UUIDGenerator'
+import SSLToolkit from './pages/SSLToolkit'
 
 // Context for global state
 export const AppContext = createContext()
@@ -409,6 +411,7 @@ const navItems = [
   { path: '/encode', label: 'Encode/Decode', icon: Code2, shortcut: '3' },
   { path: '/hash', label: 'Hash Generator', icon: Hash, shortcut: '4' },
   { path: '/uuid', label: 'UUID Generator', icon: Fingerprint, shortcut: '5' },
+  { path: '/ssl', label: 'SSL/TLS Toolkit', icon: Lock, shortcut: '6' },
 ]
 
 // Tool descriptions for search
@@ -419,6 +422,7 @@ const toolDescriptions = {
   '/encode': ['encode', 'decode', 'base64', 'url', 'html', 'entity', 'hex', 'binary', 'unicode'],
   '/hash': ['hash', 'md5', 'sha', 'sha256', 'sha512', 'checksum', 'digest', 'crypto'],
   '/uuid': ['uuid', 'guid', 'unique', 'id', 'identifier', 'v4', 'v7', 'generate'],
+  '/ssl': ['ssl', 'tls', 'certificate', 'cert', 'x509', 'pem', 'der', 'csr', 'chain', 'key', 'private', 'public', 'https'],
 }
 
 // Sidebar component
@@ -837,11 +841,11 @@ function App() {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark')
       }
       
-      // Tool shortcuts (1-5)
+      // Tool shortcuts (1-6)
       if (!e.ctrlKey && !e.metaKey && !e.target.matches('input, textarea')) {
         const num = parseInt(e.key)
-        if (num >= 1 && num <= 5) {
-          const paths = ['/jwt', '/json', '/encode', '/hash', '/uuid']
+        if (num >= 1 && num <= 6) {
+          const paths = ['/jwt', '/json', '/encode', '/hash', '/uuid', '/ssl']
           window.location.hash = paths[num - 1]
         }
       }
@@ -916,6 +920,7 @@ function App() {
                     <Route path="/encode" element={<EncodeDecode />} />
                     <Route path="/hash" element={<HashGenerator />} />
                     <Route path="/uuid" element={<UUIDGenerator />} />
+                    <Route path="/ssl/*" element={<SSLToolkit />} />
                   </Routes>
                 </AnimatePresence>
               </main>
