@@ -5,7 +5,8 @@ import {
   Shield, Key, Braces, Code2, Hash, Fingerprint, 
   Search, ShieldOff, Wifi, WifiOff, Github, 
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
-  Palette, Check, ShieldCheck, Download, Smartphone
+  Palette, Check, ShieldCheck, Download, Smartphone,
+  Monitor, Share2, MoreVertical, Plus, ExternalLink
 } from 'lucide-react'
 
 // Import components
@@ -48,6 +49,185 @@ const Toast = ({ message, onClose }) => (
       <X className="w-4 h-4" />
     </button>
   </motion.div>
+)
+
+// Detect browser/platform
+const getBrowserInfo = () => {
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream
+  const isAndroid = /Android/.test(ua)
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua)
+  const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor)
+  const isFirefox = /Firefox/.test(ua)
+  const isEdge = /Edg/.test(ua)
+  const isSamsung = /SamsungBrowser/.test(ua)
+  const isOpera = /OPR/.test(ua)
+  
+  if (isIOS && isSafari) return { name: 'Safari iOS', platform: 'ios' }
+  if (isIOS && isChrome) return { name: 'Chrome iOS', platform: 'ios' }
+  if (isAndroid && isSamsung) return { name: 'Samsung Internet', platform: 'android' }
+  if (isAndroid && isChrome) return { name: 'Chrome Android', platform: 'android' }
+  if (isAndroid && isFirefox) return { name: 'Firefox Android', platform: 'android' }
+  if (isEdge) return { name: 'Microsoft Edge', platform: 'desktop' }
+  if (isChrome) return { name: 'Google Chrome', platform: 'desktop' }
+  if (isFirefox) return { name: 'Firefox', platform: 'desktop' }
+  if (isOpera) return { name: 'Opera', platform: 'desktop' }
+  if (isSafari) return { name: 'Safari', platform: 'desktop' }
+  
+  return { name: 'Browser', platform: 'unknown' }
+}
+
+// Install Modal Component
+const InstallModal = ({ isOpen, onClose, deferredPrompt, setDeferredPrompt }) => {
+  const { showToast } = useApp()
+  const browser = getBrowserInfo()
+  
+  const handleNativeInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'accepted') {
+        showToast('OffGrid installed successfully!')
+        onClose()
+      }
+      setDeferredPrompt(null)
+    }
+  }
+  
+  const getInstructions = () => {
+    switch (browser.platform) {
+      case 'ios':
+        return {
+          title: 'Install on iOS',
+          steps: [
+            { icon: <Share2 className="w-5 h-5" />, text: 'Tap the Share button in Safari\'s toolbar' },
+            { icon: <Plus className="w-5 h-5" />, text: 'Scroll down and tap "Add to Home Screen"' },
+            { icon: <Check className="w-5 h-5" />, text: 'Tap "Add" to install OffGrid' }
+          ],
+          note: 'Note: On iOS, PWAs must be installed from Safari.'
+        }
+      case 'android':
+        return {
+          title: 'Install on Android',
+          steps: [
+            { icon: <MoreVertical className="w-5 h-5" />, text: 'Tap the menu button (⋮) in your browser' },
+            { icon: <Download className="w-5 h-5" />, text: 'Tap "Install app" or "Add to Home screen"' },
+            { icon: <Check className="w-5 h-5" />, text: 'Confirm by tapping "Install"' }
+          ],
+          note: null
+        }
+      default:
+        return {
+          title: 'Install on Desktop',
+          steps: [
+            { icon: <MoreVertical className="w-5 h-5" />, text: `Click the menu button in ${browser.name}` },
+            { icon: <Download className="w-5 h-5" />, text: 'Look for "Install OffGrid" or "Install app"' },
+            { icon: <Monitor className="w-5 h-5" />, text: 'Or look for the install icon (⊕) in the address bar' }
+          ],
+          note: 'Tip: In Chrome/Edge, you may see an install icon in the address bar.'
+        }
+    }
+  }
+  
+  const instructions = getInstructions()
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      
+      {/* Modal */}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+        className="relative w-full max-w-md glass-card rounded-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-[var(--border-color)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent)] to-purple-500 flex items-center justify-center">
+                <Download className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Install OffGrid</h2>
+                <p className="text-sm text-[var(--text-secondary)]">{browser.name}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="p-6">
+          {/* Native install button if available */}
+          {deferredPrompt && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleNativeInstall}
+              className="w-full mb-6 p-4 rounded-xl bg-gradient-to-r from-[var(--accent)] to-purple-500 text-white font-medium flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Install Now
+            </motion.button>
+          )}
+          
+          {/* Manual instructions */}
+          <div className={deferredPrompt ? 'opacity-60' : ''}>
+            {deferredPrompt && (
+              <p className="text-sm text-[var(--text-secondary)] mb-4 text-center">
+                — or install manually —
+              </p>
+            )}
+            
+            <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4">
+              {instructions.title}
+            </h3>
+            
+            <div className="space-y-3">
+              {instructions.steps.map((step, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
+                    {step.icon}
+                  </div>
+                  <p className="text-sm text-[var(--text-secondary)] pt-1.5">{step.text}</p>
+                </div>
+              ))}
+            </div>
+            
+            {instructions.note && (
+              <p className="mt-4 text-xs text-[var(--text-tertiary)] italic">
+                {instructions.note}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]/50">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+            <ShieldCheck className="w-4 h-4" />
+            <span>Works offline • No data collection • Open source</span>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
 )
 
 // Theme Toggle
@@ -243,7 +423,7 @@ const toolDescriptions = {
 }
 
 // Sidebar component
-const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, setDeferredPrompt, isInstalled }) => {
+const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, isInstalled, onShowInstallModal }) => {
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef(null)
@@ -386,8 +566,8 @@ const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, setDeferredPrompt, isInsta
         <div className="p-4 border-t border-[var(--border-color)] space-y-2">
           <InstallButton 
             deferredPrompt={deferredPrompt}
-            setDeferredPrompt={setDeferredPrompt}
             isInstalled={isInstalled}
+            onShowModal={onShowInstallModal}
           />
           <DevModeToggle />
         </div>
@@ -417,30 +597,7 @@ const DevModeToggle = () => {
 }
 
 // PWA Install Button (Sidebar version)
-const InstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
-  const { showToast } = useApp()
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) {
-      // Show instructions for manual installation
-      showToast('Use browser menu → "Install App" or "Add to Home Screen"')
-      return
-    }
-
-    // Show the install prompt
-    deferredPrompt.prompt()
-    
-    // Wait for the user to respond
-    const { outcome } = await deferredPrompt.userChoice
-    
-    if (outcome === 'accepted') {
-      showToast('OffGrid installed successfully!')
-    }
-    
-    // Clear the deferred prompt
-    setDeferredPrompt(null)
-  }
-
+const InstallButton = ({ deferredPrompt, isInstalled, onShowModal }) => {
   // Show installed state
   if (isInstalled) {
     return (
@@ -456,7 +613,7 @@ const InstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
     <motion.button
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={handleInstall}
+      onClick={onShowModal}
       className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 ${
         deferredPrompt 
           ? 'bg-gradient-to-r from-[var(--accent)]/20 to-purple-500/20 hover:from-[var(--accent)]/30 hover:to-purple-500/30 border border-[var(--accent)]/30'
@@ -481,26 +638,7 @@ const InstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
 }
 
 // Header Install Button (compact version)
-const HeaderInstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled }) => {
-  const { showToast } = useApp()
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) {
-      // Show instructions for manual installation
-      showToast('Use browser menu → "Install App" or "Add to Home Screen"')
-      return
-    }
-
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    
-    if (outcome === 'accepted') {
-      showToast('OffGrid installed successfully!')
-    }
-    
-    setDeferredPrompt(null)
-  }
-
+const HeaderInstallButton = ({ deferredPrompt, isInstalled, onShowModal }) => {
   // If already installed, show a badge
   if (isInstalled) {
     return (
@@ -515,7 +653,7 @@ const HeaderInstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled })
     <motion.button
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      onClick={handleInstall}
+      onClick={onShowModal}
       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
         deferredPrompt 
           ? 'bg-gradient-to-r from-[var(--accent)] to-purple-500 text-white hover:opacity-90' 
@@ -530,7 +668,7 @@ const HeaderInstallButton = ({ deferredPrompt, setDeferredPrompt, isInstalled })
 }
 
 // Header component
-const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt, setDeferredPrompt, isInstalled }) => {
+const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt, isInstalled, onShowInstallModal }) => {
   const { isOnline } = useApp()
 
   return (
@@ -549,8 +687,8 @@ const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt,
           {/* Install App Button */}
           <HeaderInstallButton 
             deferredPrompt={deferredPrompt}
-            setDeferredPrompt={setDeferredPrompt}
             isInstalled={isInstalled}
+            onShowModal={onShowInstallModal}
           />
 
           {/* Online/Offline indicator */}
@@ -617,6 +755,7 @@ function App() {
   // PWA Install state
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [installModalOpen, setInstallModalOpen] = useState(false)
 
   // Handle boot complete
   const handleBootComplete = () => {
@@ -753,8 +892,8 @@ function App() {
               isOpen={sidebarOpen} 
               setIsOpen={setSidebarOpen}
               deferredPrompt={deferredPrompt}
-              setDeferredPrompt={setDeferredPrompt}
               isInstalled={isInstalled}
+              onShowInstallModal={() => setInstallModalOpen(true)}
             />
             
             <div className="flex-1 flex flex-col min-h-screen">
@@ -765,8 +904,8 @@ function App() {
                 accent={accent}
                 setAccent={setAccent}
                 deferredPrompt={deferredPrompt}
-                setDeferredPrompt={setDeferredPrompt}
                 isInstalled={isInstalled}
+                onShowInstallModal={() => setInstallModalOpen(true)}
               />
               
               <main className="flex-1 p-4 lg:p-6 relative z-0">
@@ -804,6 +943,18 @@ function App() {
           {/* Toast notifications */}
           <AnimatePresence>
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+          </AnimatePresence>
+
+          {/* Install Modal */}
+          <AnimatePresence>
+            {installModalOpen && (
+              <InstallModal
+                isOpen={installModalOpen}
+                onClose={() => setInstallModalOpen(false)}
+                deferredPrompt={deferredPrompt}
+                setDeferredPrompt={setDeferredPrompt}
+              />
+            )}
           </AnimatePresence>
         </motion.div>
       )}
