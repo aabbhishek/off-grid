@@ -385,7 +385,7 @@ const PrivacyBadge = () => {
                 </li>
               </ul>
               <a 
-                href="https://github.com" 
+                href="https://github.com/aabbhishek/off-grid" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="mt-3 flex items-center gap-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-colors"

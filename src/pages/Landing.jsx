@@ -128,7 +128,7 @@ export default function Landing() {
             <ArrowRight className="w-4 h-4" />
           </Link>
           <a 
-            href="https://github.com" 
+            href="https://github.com/aabbhishek/off-grid" 
             target="_blank" 
             rel="noopener noreferrer"
             className="glass-button"
