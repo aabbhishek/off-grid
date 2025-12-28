@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt'],
+      includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
         name: 'OffGrid - Privacy-First Developer Toolkit',
         short_name: 'OffGrid',
@@ -22,31 +22,28 @@ export default defineConfig({
         categories: ['developer', 'utilities', 'productivity'],
         icons: [
           {
-            src: '/off-grid/logo192.png',
+            src: '/off-grid/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          },
+          {
+            src: '/off-grid/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/off-grid/logo512.png',
+            src: '/off-grid/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/off-grid/logo512.png',
+            src: '/off-grid/icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
-          }
-        ],
-        screenshots: [
-          {
-            src: '/off-grid/screenshot.png',
-            sizes: '1280x720',
-            type: 'image/png',
-            form_factor: 'wide',
-            label: 'OffGrid Dashboard'
           }
         ]
       },

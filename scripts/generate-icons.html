@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Generate PWA Icons - OffGrid</title>
+  <style>
+    body { font-family: system-ui; padding: 20px; background: #1a1a2e; color: #fff; }
+    .icon-container { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+    .icon-box { text-align: center; }
+    canvas { border: 1px solid #333; border-radius: 12px; background: #0a0a14; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #00d4ff; border: none; border-radius: 5px; font-weight: 600; }
+    button:hover { background: #00b8e6; }
+    h1 { color: #00d4ff; }
+    h2 { color: #a855f7; margin-top: 40px; }
+    p { color: #888; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>OffGrid PWA Icon Generator</h1>
+  <p>Click on each button to download the PNG icon. Save them to the <code>public/</code> folder.</p>
+  
+  <h2>PWA Icons</h2>
+  <div class="icon-container">
+    <div class="icon-box">
+      <h3>192x192</h3>
+      <canvas id="canvas192" width="192" height="192"></canvas>
+      <br><button onclick="download('canvas192', 'icon-192.png')">Download icon-192.png</button>
+    </div>
+    <div class="icon-box">
+      <h3>512x512</h3>
+      <canvas id="canvas512" width="512" height="512"></canvas>
+      <br><button onclick="download('canvas512', 'icon-512.png')">Download icon-512.png</button>
+    </div>
+    <div class="icon-box">
+      <h3>512x512 (Maskable)</h3>
+      <canvas id="canvasMaskable" width="512" height="512"></canvas>
+      <br><button onclick="download('canvasMaskable', 'icon-maskable-512.png')">Download icon-maskable-512.png</button>
+    </div>
+    <div class="icon-box">
+      <h3>180x180 (Apple Touch)</h3>
+      <canvas id="canvasApple" width="180" height="180"></canvas>
+      <br><button onclick="download('canvasApple', 'apple-touch-icon.png')">Download apple-touch-icon.png</button>
+    </div>
+  </div>
+
+  <script>
+    // Shield icon with background
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <defs>
+        <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      
+      <rect width="100" height="100" rx="22" fill="#0a0a14"/>
+      
+      <path d="M50 15 L75 25 L75 50 C75 67 63 80 50 85 C37 80 25 67 25 50 L25 25 Z" 
+            fill="url(#shieldGrad)" 
+            stroke="rgba(255,255,255,0.2)" 
+            stroke-width="1"/>
+      
+      <path d="M38 48 L46 56 L62 40" 
+            fill="none" 
+            stroke="white" 
+            stroke-width="5" 
+            stroke-linecap="round" 
+            stroke-linejoin="round"/>
+      
+      <circle cx="72" cy="72" r="14" fill="#0a0a14" stroke="#10b981" stroke-width="2"/>
+      <g transform="translate(72, 72)">
+        <line x1="-5" y1="-5" x2="5" y2="5" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+        <path d="M-4 -2 Q0 -6 4 -2" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="0" cy="3" r="1.5" fill="#10b981"/>
+      </g>
+    </svg>`;
+
+    // Maskable version (more padding for safe zone)
+    const svgMaskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <defs>
+        <linearGradient id="shieldGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      
+      <rect width="100" height="100" fill="#0a0a14"/>
+      
+      <g transform="translate(50, 50) scale(0.6) translate(-50, -50)">
+        <path d="M50 15 L75 25 L75 50 C75 67 63 80 50 85 C37 80 25 67 25 50 L25 25 Z" 
+              fill="url(#shieldGrad2)"/>
+        
+        <path d="M38 48 L46 56 L62 40" 
+              fill="none" 
+              stroke="white" 
+              stroke-width="6" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+
+    function renderSVG(canvasId, svg, size) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      
+      img.onload = () => {
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+
+    function download(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Render all icons
+    renderSVG('canvas192', svgIcon, 192);
+    renderSVG('canvas512', svgIcon, 512);
+    renderSVG('canvasMaskable', svgMaskable, 512);
+    renderSVG('canvasApple', svgIcon, 180);
+  </script>
+</body>
+</html>
