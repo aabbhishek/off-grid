@@ -228,7 +228,6 @@ const InstallModal = ({ isOpen, onClose, deferredPrompt, setDeferredPrompt }) =>
     </motion.div>
   )
 }
-)
 
 // Theme Toggle
 const ThemeToggle = ({ theme, setTheme }) => {
