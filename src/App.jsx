@@ -479,7 +479,7 @@ const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, isInstalled, onShowInstall
 
       {/* Sidebar */}
       <motion.aside
-        className={`fixed lg:sticky top-0 left-0 h-screen w-72 glass-card rounded-none lg:rounded-r-2xl z-50 flex flex-col ${
+        className={`fixed top-0 left-0 h-screen w-64 lg:w-72 glass-card rounded-none lg:rounded-r-2xl z-50 flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } transition-transform duration-300`}
       >
@@ -890,7 +890,7 @@ function App() {
           transition={{ duration: 0.5 }}
           className="min-h-screen mesh-bg"
         >
-          <div className="flex">
+          <div className="flex min-h-screen">
             <Sidebar 
               isOpen={sidebarOpen} 
               setIsOpen={setSidebarOpen}
@@ -899,7 +899,8 @@ function App() {
               onShowInstallModal={() => setInstallModalOpen(true)}
             />
             
-            <div className="flex-1 flex flex-col min-h-screen">
+            {/* Main content with left margin on desktop for fixed sidebar */}
+            <div className="flex-1 flex flex-col min-h-screen lg:ml-72">
               <Header 
                 setIsOpen={setSidebarOpen} 
                 theme={theme} 
