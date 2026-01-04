@@ -9,7 +9,7 @@ import {
 const tools = [
   {
     path: '/jwt',
-    name: 'JWT Decoder',
+    name: 'JWT Toolkit',
     description: 'Decode and verify JSON Web Tokens safely',
     icon: Key,
     color: 'from-cyan-500 to-blue-500',
