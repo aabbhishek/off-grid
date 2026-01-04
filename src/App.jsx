@@ -406,7 +406,7 @@ const PrivacyBadge = () => {
 // Navigation items
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
-  { path: '/jwt', label: 'JWT Decoder', icon: Key, shortcut: '1' },
+  { path: '/jwt', label: 'JWT Toolkit', icon: Key, shortcut: '1' },
   { path: '/json', label: 'JSON Formatter', icon: Braces, shortcut: '2' },
   { path: '/encode', label: 'Encode/Decode', icon: Code2, shortcut: '3' },
   { path: '/hash', label: 'Hash Generator', icon: Hash, shortcut: '4' },
