@@ -28,7 +28,7 @@ const bootSequence = [
   { text: '[  OK  ] Started Encryption Module', delay: 100, status: 'ok' },
   { text: '', delay: 50 },
   { text: 'Initializing modules...', delay: 150 },
-  { text: '  → JWT Decoder ........................... loaded', delay: 80 },
+  { text: '  → JWT Toolkit ........................... loaded', delay: 80 },
   { text: '  → JSON Formatter ....................... loaded', delay: 80 },
   { text: '  → Encode/Decode Tools .................. loaded', delay: 80 },
   { text: '  → Hash Generator ....................... loaded', delay: 80 },
