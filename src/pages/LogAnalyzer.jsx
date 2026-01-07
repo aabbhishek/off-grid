@@ -24,6 +24,7 @@ const LOG_LEVELS = {
   WARN: { color: '#fbbf24', bg: 'bg-amber-500/20', text: 'text-amber-400', icon: AlertTriangle },
   ERROR: { color: '#f87171', bg: 'bg-red-500/20', text: 'text-red-400', icon: AlertCircle },
   FATAL: { color: '#ef4444', bg: 'bg-red-600/20', text: 'text-red-500', icon: AlertCircle },
+  UNPARSED: { color: '#6b7280', bg: 'bg-gray-600/20', text: 'text-gray-500', icon: AlertTriangle },
 }
 
 const CHART_COLORS = ['#34d399', '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#f472b6']
@@ -117,11 +118,39 @@ const LOG_PATTERNS = {
     parse: (line) => {
       try {
         const obj = JSON.parse(line)
+        
+        // Reject if not an object (e.g., arrays, primitives)
+        if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+          return null
+        }
+        
+        // Check if it has at least some meaningful log structure
+        const hasLevel = obj.level !== undefined || obj.severity !== undefined || obj.lvl !== undefined
+        const hasMessage = obj.message !== undefined || obj.msg !== undefined || obj.text !== undefined || obj.log !== undefined
+        const hasTimestamp = obj.timestamp !== undefined || obj.time !== undefined || obj.ts !== undefined || obj['@timestamp'] !== undefined || obj.date !== undefined
+        
+        // If it has none of these, it's probably not a log entry
+        if (!hasLevel && !hasMessage && !hasTimestamp) {
+          return null
+        }
+        
+        // Get message, ensuring it's a string
+        let message = obj.message || obj.msg || obj.text || obj.log
+        if (message && typeof message === 'object') {
+          message = JSON.stringify(message)
+        } else if (!message) {
+          message = JSON.stringify(obj)
+        }
+        // Get timestamp, converting if needed
+        let timestamp = obj.timestamp || obj.time || obj.ts || obj['@timestamp'] || obj.date
+        if (typeof timestamp === 'number') {
+          timestamp = new Date(timestamp).toISOString()
+        }
         return {
-          timestamp: obj.timestamp || obj.time || obj.ts || obj['@timestamp'] || obj.date,
+          timestamp,
           level: normalizeLevel(obj.level || obj.severity || obj.lvl),
-          message: obj.message || obj.msg || obj.text || obj.log || JSON.stringify(obj),
-          source: obj.source || obj.logger || obj.name || obj.component,
+          message: String(message),
+          source: String(obj.source || obj.logger || obj.name || obj.component || ''),
           fields: obj
         }
       } catch { return null }
@@ -286,8 +315,11 @@ function parseLogs(content) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     
+    // Skip empty lines or whitespace-only lines
+    if (!line.trim()) continue
+    
     // Check if this is a stack trace continuation
-    if (isStackTraceLine(line) && lastEntry) {
+    if (isStackTraceLine(line) && lastEntry && lastEntry.level !== 'UNPARSED') {
       currentStackTrace.push(line)
       continue
     }
@@ -298,13 +330,39 @@ function parseLogs(content) {
       currentStackTrace = []
     }
     
-    const parsed = format.parse(line, i)
+    let parsed = null
+    try {
+      parsed = format.parse(line, i)
+    } catch (e) {
+      // Parsing threw an error
+      parsed = null
+    }
+    
     if (parsed) {
       parsed.raw = line
       parsed.lineNumber = i + 1
       parsed.id = i
+      // Ensure message is always a string
+      if (parsed.message && typeof parsed.message === 'object') {
+        parsed.message = JSON.stringify(parsed.message)
+      }
       entries.push(parsed)
       lastEntry = parsed
+    } else {
+      // Line couldn't be parsed - create an UNPARSED entry
+      const unparsedEntry = {
+        id: i,
+        lineNumber: i + 1,
+        level: 'UNPARSED',
+        message: 'Unable to parse this line',
+        timestamp: null,
+        source: '',
+        raw: line,
+        fields: {},
+        unparsed: true
+      }
+      entries.push(unparsedEntry)
+      // Don't set lastEntry for unparsed - we don't want stack traces attached to them
     }
   }
   
@@ -314,8 +372,13 @@ function parseLogs(content) {
   }
   
   // Calculate stats
+  const unparsedCount = entries.filter(e => e.level === 'UNPARSED').length
+  const parsedEntries = entries.filter(e => e.level !== 'UNPARSED')
+  
   const stats = {
     total: entries.length,
+    parsed: parsedEntries.length,
+    unparsed: unparsedCount,
     byLevel: {},
     timeRange: { start: null, end: null },
     formatName: format.name,
@@ -351,8 +414,286 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
+// Helper to safely convert any value to displayable string
+function safeStringify(value) {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return '[Object]'
+    }
+  }
+  return String(value)
+}
+
+// Extract debug-important fields from JSON error logs
+function extractDebugInfo(entry) {
+  const debugInfo = {
+    httpInfo: [],      // URLs, status codes, methods
+    errorInfo: [],     // Error messages, types
+    contextInfo: [],   // Hostname, PID, context, service
+    securityInfo: [],  // Tokens, keys (masked)
+    requestInfo: [],   // Request/response bodies
+    metadata: []       // Other useful metadata
+  }
+  
+  // Deep search function to find values in nested objects
+  const deepSearch = (obj, path = '') => {
+    if (!obj || typeof obj !== 'object') return
+    
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = path ? `${path}.${key}` : key
+      const lowerKey = key.toLowerCase()
+      
+      if (typeof value === 'string') {
+        // URL detection
+        if (lowerKey.includes('url') || value.match(/^https?:\/\//)) {
+          debugInfo.httpInfo.push({ label: 'URL', value, path: currentPath, icon: '🔗' })
+        }
+        // Status/Response code in string
+        else if (lowerKey === 'message' && value.includes('status code')) {
+          const codeMatch = value.match(/status code (\d+)/)
+          if (codeMatch) {
+            debugInfo.httpInfo.push({ label: 'Status Message', value, path: currentPath, icon: '📝' })
+          }
+        }
+        // Error message
+        else if (lowerKey === 'message' || lowerKey === 'error' || lowerKey === 'msg') {
+          // Try to parse if it's JSON string
+          if (value.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(value)
+              deepSearch(parsed, currentPath + '(parsed)')
+            } catch {}
+          }
+          debugInfo.errorInfo.push({ label: key, value: value.slice(0, 200), path: currentPath, icon: '❌' })
+        }
+        // Stack trace
+        else if (lowerKey === 'stack' || lowerKey === 'stacktrace') {
+          debugInfo.errorInfo.push({ label: 'Stack Trace', value, path: currentPath, icon: '📚', isStack: true })
+        }
+        // Method
+        else if (lowerKey === 'method' && ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(value.toUpperCase())) {
+          debugInfo.httpInfo.push({ label: 'Method', value: value.toUpperCase(), path: currentPath, icon: '📤' })
+        }
+        // Token/Key detection (mask them)
+        else if (lowerKey.includes('token') || lowerKey.includes('key') || lowerKey.includes('secret') || lowerKey.includes('password') || lowerKey.includes('api_token')) {
+          const masked = value.length > 8 ? value.slice(0, 4) + '****' + value.slice(-4) : '****'
+          debugInfo.securityInfo.push({ label: key, value: masked, originalValue: value, path: currentPath, icon: '🔐', sensitive: true })
+        }
+        // Context info
+        else if (['hostname', 'host', 'context', 'service', 'name', 'label'].includes(lowerKey)) {
+          debugInfo.contextInfo.push({ label: key, value, path: currentPath, icon: '🏷️' })
+        }
+        // Body/Response content (try to parse JSON)
+        else if (lowerKey === 'body' || lowerKey === 'response' || lowerKey === 'request') {
+          if (value.startsWith('{') || value.startsWith('[')) {
+            try {
+              const parsed = JSON.parse(value)
+              deepSearch(parsed, currentPath + '(parsed)')
+              debugInfo.requestInfo.push({ label: key, value: JSON.stringify(parsed, null, 2), path: currentPath, icon: '📦', isJson: true })
+            } catch {
+              debugInfo.requestInfo.push({ label: key, value, path: currentPath, icon: '📦' })
+            }
+          } else if (value) {
+            debugInfo.requestInfo.push({ label: key, value, path: currentPath, icon: '📦' })
+          }
+        }
+      } else if (typeof value === 'number') {
+        // Status code
+        if (lowerKey.includes('status') || lowerKey.includes('code') || lowerKey === 'responsecode') {
+          const isError = value >= 400
+          debugInfo.httpInfo.push({ 
+            label: key, 
+            value: String(value), 
+            path: currentPath, 
+            icon: isError ? '🔴' : '🟢',
+            highlight: isError ? 'error' : 'success'
+          })
+        }
+        // PID
+        else if (lowerKey === 'pid') {
+          debugInfo.contextInfo.push({ label: 'PID', value: String(value), path: currentPath, icon: '⚙️' })
+        }
+        // Level (Pino style)
+        else if (lowerKey === 'level') {
+          debugInfo.contextInfo.push({ label: 'Level', value: String(value), path: currentPath, icon: '📊' })
+        }
+        // Time
+        else if (lowerKey === 'time' && value > 1000000000000) {
+          debugInfo.contextInfo.push({ 
+            label: 'Time', 
+            value: new Date(value).toISOString(), 
+            path: currentPath, 
+            icon: '🕐' 
+          })
+        }
+      } else if (typeof value === 'boolean') {
+        if (lowerKey.includes('handle') || lowerKey.includes('report') || lowerKey.includes('retry')) {
+          debugInfo.metadata.push({ label: key, value: String(value), path: currentPath, icon: '🔘' })
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Recurse into nested objects
+        if (lowerKey === 'err' || lowerKey === 'error') {
+          deepSearch(value, currentPath)
+        } else if (lowerKey === 'metadata' || lowerKey === 'state') {
+          deepSearch(value, currentPath)
+        } else if (lowerKey === 'response' || lowerKey === 'request') {
+          deepSearch(value, currentPath)
+        } else if (lowerKey === 'link') {
+          deepSearch(value, currentPath)
+        } else {
+          deepSearch(value, currentPath)
+        }
+      }
+    }
+  }
+  
+  // Parse raw line if JSON
+  try {
+    const parsed = JSON.parse(entry.raw)
+    deepSearch(parsed)
+  } catch {
+    // Not JSON, try to extract from fields
+    if (entry.fields) {
+      deepSearch(entry.fields)
+    }
+  }
+  
+  // Also check entry.fields directly
+  if (entry.fields) {
+    deepSearch(entry.fields, 'fields')
+  }
+  
+  // Deduplicate by value
+  const dedupe = (arr) => {
+    const seen = new Set()
+    return arr.filter(item => {
+      const key = item.label + ':' + item.value
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+  
+  return {
+    httpInfo: dedupe(debugInfo.httpInfo),
+    errorInfo: dedupe(debugInfo.errorInfo),
+    contextInfo: dedupe(debugInfo.contextInfo),
+    securityInfo: dedupe(debugInfo.securityInfo),
+    requestInfo: dedupe(debugInfo.requestInfo),
+    metadata: dedupe(debugInfo.metadata)
+  }
+}
+
+// Sensitive Value Component with toggle
+function SensitiveValue({ masked, original, copyToClipboard }) {
+  const [revealed, setRevealed] = useState(false)
+  
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="font-mono text-amber-400 break-all">
+        {revealed ? original : masked}
+      </span>
+      <button
+        onClick={(e) => { e.stopPropagation(); setRevealed(!revealed) }}
+        className="p-0.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+        title={revealed ? 'Hide value' : 'Reveal value'}
+      >
+        {revealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+      </button>
+      {revealed && (
+        <button
+          onClick={(e) => { 
+            e.stopPropagation()
+            if (copyToClipboard) {
+              copyToClipboard(original)
+            } else {
+              navigator.clipboard.writeText(original)
+            }
+          }}
+          className="p-0.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+          title="Copy to clipboard"
+        >
+          <Copy className="w-3 h-3" />
+        </button>
+      )}
+    </span>
+  )
+}
+
+// Debug Info Section Component
+function DebugInfoSection({ title, items, icon, color = 'blue', copyToClipboard }) {
+  if (!items || items.length === 0) return null
+  
+  const colorClasses = {
+    blue: 'border-blue-500/30 bg-blue-500/10',
+    red: 'border-red-500/30 bg-red-500/10',
+    amber: 'border-amber-500/30 bg-amber-500/10',
+    green: 'border-green-500/30 bg-green-500/10',
+    purple: 'border-purple-500/30 bg-purple-500/10',
+    gray: 'border-gray-500/30 bg-gray-500/10'
+  }
+  
+  return (
+    <div className={`rounded-lg border p-3 ${colorClasses[color]}`}>
+      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-[var(--text-secondary)]">
+        <span>{icon}</span>
+        <span>{title}</span>
+        <span className="text-[var(--text-tertiary)]">({items.length})</span>
+      </div>
+      <div className="space-y-1.5">
+        {items.map((item, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="flex-shrink-0">{item.icon}</span>
+            <span className="text-[var(--text-tertiary)] flex-shrink-0">{item.label}:</span>
+            {item.sensitive && item.originalValue ? (
+              <SensitiveValue 
+                masked={safeStringify(item.value)} 
+                original={safeStringify(item.originalValue)} 
+                copyToClipboard={copyToClipboard}
+              />
+            ) : item.isStack ? (
+              <details className="flex-1 min-w-0">
+                <summary className="text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent)]">
+                  Click to expand stack trace
+                </summary>
+                <pre className="mt-1 p-2 rounded bg-[var(--bg-secondary)] text-red-400 text-xs whitespace-pre-wrap break-words overflow-x-auto max-h-[200px] overflow-y-auto">
+                  {safeStringify(item.value)}
+                </pre>
+              </details>
+            ) : item.isJson ? (
+              <details className="flex-1 min-w-0">
+                <summary className="text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent)]">
+                  Click to expand JSON
+                </summary>
+                <pre className="mt-1 p-2 rounded bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs whitespace-pre-wrap break-words overflow-x-auto max-h-[200px] overflow-y-auto">
+                  {safeStringify(item.value)}
+                </pre>
+              </details>
+            ) : (
+              <span className={`font-mono break-all ${
+                item.highlight === 'error' ? 'text-red-400 font-semibold' : 
+                item.highlight === 'success' ? 'text-green-400' :
+                item.sensitive ? 'text-amber-400' :
+                'text-[var(--text-secondary)]'
+              }`}>
+                {safeStringify(item.value)}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // Log Entry Component
-function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm }) {
+function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm, devMode, copyToClipboard }) {
   const levelConfig = LOG_LEVELS[entry.level] || LOG_LEVELS.INFO
   const Icon = levelConfig.icon
   
@@ -366,6 +707,21 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm }) {
     )
   }
   
+  // Extract debug info for dev mode
+  const debugInfo = useMemo(() => {
+    if (!devMode || !expanded) return null
+    return extractDebugInfo(entry)
+  }, [devMode, expanded, entry])
+  
+  const hasDebugInfo = debugInfo && (
+    debugInfo.httpInfo.length > 0 ||
+    debugInfo.errorInfo.length > 0 ||
+    debugInfo.contextInfo.length > 0 ||
+    debugInfo.securityInfo.length > 0 ||
+    debugInfo.requestInfo.length > 0 ||
+    debugInfo.metadata.length > 0
+  )
+  
   return (
     <div className={`border-b border-[var(--border-color)] hover:bg-[var(--bg-tertiary)]/50 transition-colors overflow-hidden ${expanded ? 'bg-[var(--bg-tertiary)]/30' : ''}`}>
       <div 
@@ -376,29 +732,45 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm }) {
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
         
-        <div className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${levelConfig.bg} ${levelConfig.text}`}>
-          {entry.level}
-        </div>
-        
-        {entry.timestamp && (
-          <span className="text-xs text-[var(--text-tertiary)] font-mono flex-shrink-0 hidden sm:inline">
-            {entry.timestamp.length > 19 ? entry.timestamp.slice(0, 19) : entry.timestamp}
-          </span>
+        {entry.unparsed ? (
+          // Special display for unparsed entries
+          <>
+            <div className="px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 bg-gray-600/20 text-gray-400 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              UNPARSED
+            </div>
+            <span className="text-xs sm:text-sm text-gray-500 flex-1 truncate min-w-0 italic">
+              Unable to parse this line
+            </span>
+          </>
+        ) : (
+          // Normal entry display
+          <>
+            <div className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${levelConfig.bg} ${levelConfig.text}`}>
+              {entry.level}
+            </div>
+            
+            {entry.timestamp && (
+              <span className="text-xs text-[var(--text-tertiary)] font-mono flex-shrink-0 hidden sm:inline">
+                {safeStringify(entry.timestamp).length > 19 ? safeStringify(entry.timestamp).slice(0, 19) : safeStringify(entry.timestamp)}
+              </span>
+            )}
+            
+            {entry.source && (
+              <span 
+                className="text-xs text-[var(--accent)] cursor-pointer hover:underline truncate max-w-[120px] sm:max-w-[200px] hidden md:inline"
+                onClick={(e) => { e.stopPropagation(); onFilter('source', entry.source) }}
+                title={safeStringify(entry.source)}
+              >
+                [{safeStringify(entry.source)}]
+              </span>
+            )}
+            
+            <span className="text-xs sm:text-sm text-[var(--text-primary)] flex-1 truncate min-w-0">
+              {highlightText(safeStringify(entry.message))}
+            </span>
+          </>
         )}
-        
-        {entry.source && (
-          <span 
-            className="text-xs text-[var(--accent)] cursor-pointer hover:underline truncate max-w-[120px] sm:max-w-[200px] hidden md:inline"
-            onClick={(e) => { e.stopPropagation(); onFilter('source', entry.source) }}
-            title={entry.source}
-          >
-            [{entry.source}]
-          </span>
-        )}
-        
-        <span className="text-xs sm:text-sm text-[var(--text-primary)] flex-1 truncate min-w-0">
-          {highlightText(entry.message)}
-        </span>
         
         <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0 hidden sm:inline">#{entry.lineNumber}</span>
       </div>
@@ -411,44 +783,110 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm }) {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-4 sm:px-10 pb-3 space-y-2">
-              {/* Full message */}
-              <div className="p-3 rounded-lg bg-[var(--bg-secondary)] font-mono text-xs whitespace-pre-wrap break-words overflow-x-auto text-[var(--text-secondary)]">
-                {highlightText(entry.message)}
-              </div>
-              
-              {/* Stack trace */}
-              {entry.stackTrace && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 font-mono text-xs whitespace-pre-wrap break-words overflow-x-auto text-red-400 max-h-[300px] overflow-y-auto">
-                  {entry.stackTrace}
+            <div className="px-4 sm:px-10 pb-3 space-y-3">
+              {entry.unparsed ? (
+                // Unparsed entry: show only raw log
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>This line could not be parsed. Raw content shown below:</span>
+                  </div>
+                  <pre className="p-3 rounded-lg bg-gray-800/50 border border-gray-700 font-mono text-xs whitespace-pre-wrap break-words overflow-x-auto text-gray-300">
+                    {safeStringify(entry.raw)}
+                  </pre>
                 </div>
+              ) : (
+                // Normal entry content
+                <>
+                  {/* Full message */}
+                  <div className="p-3 rounded-lg bg-[var(--bg-secondary)] font-mono text-xs whitespace-pre-wrap break-words overflow-x-auto text-[var(--text-secondary)]">
+                    {highlightText(safeStringify(entry.message))}
+                  </div>
+                  
+                  {/* Dev Mode: Auto-detected Debug Info */}
+                  {devMode && hasDebugInfo && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-[var(--accent)]">
+                        <Zap className="w-3 h-3" />
+                        <span className="font-medium">Auto-detected Debug Info</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        <DebugInfoSection 
+                          title="HTTP Info" 
+                          items={debugInfo.httpInfo} 
+                          icon="🌐" 
+                          color="blue" 
+                        />
+                        <DebugInfoSection 
+                          title="Error Details" 
+                          items={debugInfo.errorInfo} 
+                          icon="⚠️" 
+                          color="red" 
+                        />
+                        <DebugInfoSection 
+                          title="Context" 
+                          items={debugInfo.contextInfo} 
+                          icon="📋" 
+                          color="gray" 
+                        />
+                        <DebugInfoSection 
+                          title="Security (Masked)" 
+                          items={debugInfo.securityInfo} 
+                          icon="🔒" 
+                          color="amber" 
+                          copyToClipboard={copyToClipboard}
+                        />
+                        <DebugInfoSection 
+                          title="Request/Response" 
+                          items={debugInfo.requestInfo} 
+                          icon="📨" 
+                          color="purple" 
+                        />
+                        <DebugInfoSection 
+                          title="Metadata" 
+                          items={debugInfo.metadata} 
+                          icon="🏷️" 
+                          color="green" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Stack trace */}
+                  {entry.stackTrace && (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 font-mono text-xs whitespace-pre-wrap break-words overflow-x-auto text-red-400 max-h-[300px] overflow-y-auto">
+                      {safeStringify(entry.stackTrace)}
+                    </div>
+                  )}
+                  
+                  {/* Fields */}
+                  {entry.fields && Object.keys(entry.fields).length > 0 && !entry.unparsed && (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(entry.fields).slice(0, 10).map(([key, value]) => (
+                        <span 
+                          key={key}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-[var(--bg-tertiary)] cursor-pointer hover:bg-[var(--bg-secondary)]"
+                          onClick={(e) => { e.stopPropagation(); onFilter(key, safeStringify(value)) }}
+                        >
+                          <span className="text-[var(--text-tertiary)]">{key}:</span>
+                          <span className="text-[var(--text-secondary)]">{safeStringify(value).slice(0, 50)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Raw line */}
+                  <details className="text-xs">
+                    <summary className="text-[var(--text-tertiary)] cursor-pointer hover:text-[var(--text-secondary)]">
+                      Show raw line
+                    </summary>
+                    <pre className="mt-2 p-2 rounded bg-[var(--bg-secondary)] overflow-x-auto text-[var(--text-tertiary)] whitespace-pre-wrap break-words">
+                      {safeStringify(entry.raw)}
+                    </pre>
+                  </details>
+                </>
               )}
-              
-              {/* Fields */}
-              {entry.fields && Object.keys(entry.fields).length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(entry.fields).slice(0, 10).map(([key, value]) => (
-                    <span 
-                      key={key}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-[var(--bg-tertiary)] cursor-pointer hover:bg-[var(--bg-secondary)]"
-                      onClick={(e) => { e.stopPropagation(); onFilter(key, value) }}
-                    >
-                      <span className="text-[var(--text-tertiary)]">{key}:</span>
-                      <span className="text-[var(--text-secondary)]">{String(value).slice(0, 50)}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-              
-              {/* Raw line */}
-              <details className="text-xs">
-                <summary className="text-[var(--text-tertiary)] cursor-pointer hover:text-[var(--text-secondary)]">
-                  Show raw line
-                </summary>
-                <pre className="mt-2 p-2 rounded bg-[var(--bg-secondary)] overflow-x-auto text-[var(--text-tertiary)]">
-                  {entry.raw}
-                </pre>
-              </details>
             </div>
           </motion.div>
         )}
@@ -458,16 +896,23 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm }) {
 }
 
 // Level Filter Component
-function LevelFilter({ levels, selected, onChange }) {
+function LevelFilter({ levels, selected, onChange, unparsedCount, showUnparsedOnly, onToggleUnparsed }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {Object.entries(LOG_LEVELS).map(([level, config]) => {
+    <div className="flex flex-wrap items-center gap-2">
+      {Object.entries(LOG_LEVELS)
+        .filter(([level]) => level !== 'UNPARSED') // UNPARSED has its own separate button
+        .map(([level, config]) => {
         const count = levels[level] || 0
         const isSelected = selected.includes(level)
         return (
           <button
             key={level}
             onClick={() => {
+              // If in unparsed-only mode, exit it first when clicking any level
+              if (showUnparsedOnly) {
+                onToggleUnparsed(false)
+              }
+              // Toggle the level selection
               if (isSelected) {
                 onChange(selected.filter(l => l !== level))
               } else {
@@ -475,6 +920,7 @@ function LevelFilter({ levels, selected, onChange }) {
               }
             }}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+              showUnparsedOnly ? 'opacity-50' :
               isSelected ? config.bg + ' ' + config.text : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
             }`}
           >
@@ -483,6 +929,26 @@ function LevelFilter({ levels, selected, onChange }) {
           </button>
         )
       })}
+      
+      {/* Unparsed entries badge/button - separate from main filters */}
+      {unparsedCount > 0 && (
+        <>
+          <div className="w-px h-5 bg-[var(--border-color)] mx-1" />
+          <button
+            onClick={() => onToggleUnparsed(!showUnparsedOnly)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+              showUnparsedOnly 
+                ? 'bg-gray-600/30 text-gray-300 ring-1 ring-gray-500' 
+                : 'bg-gray-600/20 text-gray-500 hover:bg-gray-600/30'
+            }`}
+            title="Show unparsed entries only"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            Unparsed
+            <span className="px-1.5 py-0.5 rounded bg-gray-600/50 text-gray-300">{unparsedCount}</span>
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -513,6 +979,7 @@ export default function LogAnalyzer() {
   const [timeRange, setTimeRange] = useState({ start: '', end: '' })
   const [sortOrder, setSortOrder] = useState('asc')
   const [activeFilters, setActiveFilters] = useState({})
+  const [showUnparsedOnly, setShowUnparsedOnly] = useState(false)
   const pageSize = 100
   const fileInputRef = useRef(null)
   
@@ -520,28 +987,38 @@ export default function LogAnalyzer() {
   useEffect(() => {
     if (!input.trim()) {
       setLogs({ entries: [], format: '', stats: {} })
+      setShowUnparsedOnly(false) // Reset unparsed filter when clearing
       return
     }
     
     const parsed = parseLogs(input)
     setLogs(parsed)
     setPage(1)
+    // Reset unparsed filter if no unparsed entries
+    if (!parsed.stats.unparsed) {
+      setShowUnparsedOnly(false)
+    }
   }, [input])
   
   // Filter entries
   const filteredEntries = useMemo(() => {
     let entries = [...logs.entries]
     
-    // Filter by level
-    entries = entries.filter(e => selectedLevels.includes(e.level))
+    // If showing unparsed only mode, filter to only UNPARSED entries
+    if (showUnparsedOnly) {
+      entries = entries.filter(e => e.level === 'UNPARSED')
+    } else {
+      // Normal mode: filter by selected levels (UNPARSED entries are always hidden in normal mode)
+      entries = entries.filter(e => selectedLevels.includes(e.level))
+    }
     
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       entries = entries.filter(e => 
-        e.message?.toLowerCase().includes(term) ||
-        e.source?.toLowerCase().includes(term) ||
-        e.raw?.toLowerCase().includes(term) ||
+        safeStringify(e.message)?.toLowerCase().includes(term) ||
+        safeStringify(e.source)?.toLowerCase().includes(term) ||
+        safeStringify(e.raw)?.toLowerCase().includes(term) ||
         JSON.stringify(e.fields).toLowerCase().includes(term)
       )
     }
@@ -572,7 +1049,7 @@ export default function LogAnalyzer() {
     }
     
     return entries
-  }, [logs.entries, selectedLevels, searchTerm, timeRange, activeFilters, sortOrder])
+  }, [logs.entries, selectedLevels, searchTerm, timeRange, activeFilters, sortOrder, showUnparsedOnly])
   
   // Paginated entries
   const paginatedEntries = useMemo(() => {
@@ -698,6 +1175,7 @@ export default function LogAnalyzer() {
     setActiveFilters({})
     setTimeRange({ start: '', end: '' })
     setPage(1)
+    setShowUnparsedOnly(false)
   }
   
   return (
@@ -854,7 +1332,10 @@ export default function LogAnalyzer() {
             <LevelFilter 
               levels={logs.stats.byLevel || {}} 
               selected={selectedLevels} 
-              onChange={setSelectedLevels} 
+              onChange={(levels) => { setSelectedLevels(levels); setPage(1) }}
+              unparsedCount={logs.stats.unparsed || 0}
+              showUnparsedOnly={showUnparsedOnly}
+              onToggleUnparsed={(val) => { setShowUnparsedOnly(val); setPage(1) }}
             />
             
             {/* Active Filters */}
@@ -874,8 +1355,19 @@ export default function LogAnalyzer() {
             
             {/* Results count */}
             <div className="text-xs text-[var(--text-tertiary)]">
-              Showing {filteredEntries.length} of {logs.entries.length} entries
-              {searchTerm && ` matching "${searchTerm}"`}
+              {showUnparsedOnly ? (
+                <>Showing {filteredEntries.length} unparsed entries</>
+              ) : (
+                <>
+                  Showing {filteredEntries.length} of {logs.stats.parsed || logs.entries.length} entries
+                  {searchTerm && ` matching "${searchTerm}"`}
+                  {logs.stats.unparsed > 0 && !showUnparsedOnly && (
+                    <span className="text-gray-500 ml-1">
+                      ({logs.stats.unparsed} unparsed hidden)
+                    </span>
+                  )}
+                </>
+              )}
             </div>
           </div>
           
@@ -897,6 +1389,8 @@ export default function LogAnalyzer() {
                       onToggle={() => toggleExpanded(entry.id)}
                       onFilter={addFilter}
                       searchTerm={searchTerm}
+                      devMode={devMode}
+                      copyToClipboard={copyToClipboard}
                     />
                   ))
                 )}
