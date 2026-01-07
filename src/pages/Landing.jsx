@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { 
   Key, Braces, Code2, Hash, Fingerprint, Shield, 
   Lock, Eye, Server, Zap, ShieldCheck, ArrowRight,
-  CheckCircle, Globe, Cpu, Sparkles, WifiOff
+  CheckCircle, Globe, Cpu, Sparkles, WifiOff, FileText
 } from 'lucide-react'
 
 const tools = [
@@ -17,11 +17,11 @@ const tools = [
   },
   {
     path: '/json',
-    name: 'JSON Formatter',
-    description: 'Format, validate, query and compare JSON',
+    name: 'JSON Toolkit',
+    description: 'Format, visualize, query and compare JSON',
     icon: Braces,
     color: 'from-purple-500 to-pink-500',
-    features: ['Pretty print', 'Tree view', 'JQ-like queries', 'Diff compare']
+    features: ['Tree & Graph view', 'Table & Charts', 'Path queries', 'Diff compare']
   },
   {
     path: '/encode',
@@ -54,6 +54,14 @@ const tools = [
     icon: Lock,
     color: 'from-rose-500 to-pink-500',
     features: ['Certificate decoder', 'Chain builder', 'CSR generator', 'Key parser']
+  },
+  {
+    path: '/logs',
+    name: 'Log Analyzer',
+    description: 'Parse, search and visualize log files locally',
+    icon: FileText,
+    color: 'from-orange-500 to-red-500',
+    features: ['Auto-format detection', 'Search & filter', 'Timeline visualization', 'Stack trace parsing']
   }
 ]
 

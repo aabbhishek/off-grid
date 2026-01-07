@@ -7,7 +7,7 @@ import {
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
   Palette, Check, ShieldCheck, Download, Smartphone,
   Monitor, Share2, MoreVertical, Plus, ExternalLink,
-  Lock
+  Lock, FileText
 } from 'lucide-react'
 
 // Import components
@@ -21,6 +21,7 @@ import EncodeDecode from './pages/EncodeDecode'
 import HashGenerator from './pages/HashGenerator'
 import UUIDGenerator from './pages/UUIDGenerator'
 import SSLToolkit from './pages/SSLToolkit'
+import LogAnalyzer from './pages/LogAnalyzer'
 
 // Context for global state
 export const AppContext = createContext()
@@ -407,11 +408,12 @@ const PrivacyBadge = () => {
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/jwt', label: 'JWT Toolkit', icon: Key, shortcut: '1' },
-  { path: '/json', label: 'JSON Formatter', icon: Braces, shortcut: '2' },
+  { path: '/json', label: 'JSON Toolkit', icon: Braces, shortcut: '2' },
   { path: '/encode', label: 'Encode/Decode', icon: Code2, shortcut: '3' },
   { path: '/hash', label: 'Hash Generator', icon: Hash, shortcut: '4' },
   { path: '/uuid', label: 'UUID Generator', icon: Fingerprint, shortcut: '5' },
   { path: '/ssl', label: 'SSL/TLS Toolkit', icon: Lock, shortcut: '6' },
+  { path: '/logs', label: 'Log Analyzer', icon: FileText, shortcut: '7' },
 ]
 
 // Tool descriptions for search
@@ -423,6 +425,7 @@ const toolDescriptions = {
   '/hash': ['hash', 'md5', 'sha', 'sha256', 'sha512', 'checksum', 'digest', 'crypto'],
   '/uuid': ['uuid', 'guid', 'unique', 'id', 'identifier', 'v4', 'v7', 'generate'],
   '/ssl': ['ssl', 'tls', 'certificate', 'cert', 'x509', 'pem', 'der', 'csr', 'chain', 'key', 'private', 'public', 'https'],
+  '/logs': ['log', 'logs', 'analyzer', 'parse', 'debug', 'error', 'trace', 'syslog', 'apache', 'nginx', 'json', 'ndjson', 'stacktrace'],
 }
 
 // Sidebar component
@@ -900,7 +903,7 @@ function App() {
             />
             
             {/* Main content with left margin on desktop for fixed sidebar */}
-            <div className="flex-1 flex flex-col min-h-screen lg:ml-72">
+            <div className="flex-1 flex flex-col min-h-screen lg:ml-72 min-w-0 overflow-x-hidden">
               <Header 
                 setIsOpen={setSidebarOpen} 
                 theme={theme} 
@@ -912,7 +915,7 @@ function App() {
                 onShowInstallModal={() => setInstallModalOpen(true)}
               />
               
-              <main className="flex-1 p-4 lg:p-6 relative z-0">
+              <main className="flex-1 p-4 lg:p-6 relative z-0 overflow-x-hidden">
                 <AnimatePresence mode="wait">
                   <Routes>
                     <Route path="/" element={<Landing />} />
@@ -922,6 +925,7 @@ function App() {
                     <Route path="/hash" element={<HashGenerator />} />
                     <Route path="/uuid" element={<UUIDGenerator />} />
                     <Route path="/ssl/*" element={<SSLToolkit />} />
+                    <Route path="/logs" element={<LogAnalyzer />} />
                   </Routes>
                 </AnimatePresence>
               </main>
