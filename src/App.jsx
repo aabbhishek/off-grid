@@ -7,7 +7,7 @@ import {
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
   Palette, Check, ShieldCheck, Download, Smartphone,
   Monitor, Share2, MoreVertical, Plus, ExternalLink,
-  Lock, FileText
+  Lock, FileText, KeySquare
 } from 'lucide-react'
 
 // Import components
@@ -22,6 +22,7 @@ import HashGenerator from './pages/HashGenerator'
 import UUIDGenerator from './pages/UUIDGenerator'
 import SSLToolkit from './pages/SSLToolkit'
 import LogAnalyzer from './pages/LogAnalyzer'
+import LocalVault from './pages/LocalVault'
 
 // Context for global state
 export const AppContext = createContext()
@@ -414,6 +415,7 @@ const navItems = [
   { path: '/uuid', label: 'UUID Generator', icon: Fingerprint, shortcut: '5' },
   { path: '/ssl', label: 'SSL/TLS Toolkit', icon: Lock, shortcut: '6' },
   { path: '/logs', label: 'Log Analyzer', icon: FileText, shortcut: '7' },
+  { path: '/vault', label: 'Local Vault', icon: KeySquare, shortcut: '8' },
 ]
 
 // Tool descriptions for search
@@ -426,6 +428,7 @@ const toolDescriptions = {
   '/uuid': ['uuid', 'guid', 'unique', 'id', 'identifier', 'v4', 'v7', 'generate'],
   '/ssl': ['ssl', 'tls', 'certificate', 'cert', 'x509', 'pem', 'der', 'csr', 'chain', 'key', 'private', 'public', 'https'],
   '/logs': ['log', 'logs', 'analyzer', 'parse', 'debug', 'error', 'trace', 'syslog', 'apache', 'nginx', 'json', 'ndjson', 'stacktrace'],
+  '/vault': ['vault', 'password', 'credential', 'secret', 'server', 'ssh', 'rdp', 'database', 'encrypted', 'secure', 'storage'],
 }
 
 // Sidebar component
@@ -915,7 +918,7 @@ function App() {
                 onShowInstallModal={() => setInstallModalOpen(true)}
               />
               
-              <main className="flex-1 p-4 lg:p-6 relative z-0 overflow-x-hidden">
+              <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
                 <AnimatePresence mode="wait">
                   <Routes>
                     <Route path="/" element={<Landing />} />
@@ -926,6 +929,7 @@ function App() {
                     <Route path="/uuid" element={<UUIDGenerator />} />
                     <Route path="/ssl/*" element={<SSLToolkit />} />
                     <Route path="/logs" element={<LogAnalyzer />} />
+                    <Route path="/vault" element={<LocalVault />} />
                   </Routes>
                 </AnimatePresence>
               </main>
