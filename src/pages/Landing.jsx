@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { 
   Key, Braces, Code2, Hash, Fingerprint, Shield, 
   Lock, Eye, Server, Zap, ShieldCheck, ArrowRight,
-  CheckCircle, Globe, Cpu, Sparkles, WifiOff, FileText
+  CheckCircle, Globe, Cpu, Sparkles, WifiOff, FileText, KeySquare
 } from 'lucide-react'
 
 const tools = [
@@ -62,6 +62,14 @@ const tools = [
     icon: FileText,
     color: 'from-orange-500 to-red-500',
     features: ['Auto-format detection', 'Search & filter', 'Timeline visualization', 'Stack trace parsing']
+  },
+  {
+    path: '/vault',
+    name: 'Local Vault',
+    description: 'Encrypted credential storage in your browser',
+    icon: KeySquare,
+    color: 'from-amber-500 to-orange-500',
+    features: ['AES-256-GCM encryption', 'Server credentials', 'Password generator', 'Zero-knowledge']
   }
 ]
 
