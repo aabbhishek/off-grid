@@ -35,6 +35,7 @@ const bootSequence = [
   { text: '  → UUID Generator ....................... loaded', delay: 80 },
   { text: '  → SSL/TLS Toolkit ...................... loaded', delay: 80 },
   { text: '  → Log Analyzer ......................... loaded', delay: 80 },
+  { text: '  → Local Vault (Encrypted) .............. loaded', delay: 80 },
   { text: '', delay: 100 },
   { text: '[  OK  ] All systems operational', delay: 150, status: 'ok' },
   { text: '[  OK  ] Your data never leaves your browser', delay: 100, status: 'ok' },
