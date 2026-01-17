@@ -4,9 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Server, Globe, User, KeyRound, Eye, EyeOff, Dices, FileText,
   Monitor, Cloud, Building, Tag, Link, Heart, Save, X, Plus, Trash2,
-  ChevronDown, ChevronUp, Shield
+  ChevronDown, ChevronUp, Shield, Palette
 } from 'lucide-react'
 import PasswordGenerator from './PasswordGenerator'
+import ColorPicker from './ColorPicker'
+import InfrastructureIcon, { InfrastructureSelector, INFRASTRUCTURE_ICONS } from './CloudProviderIcons'
 
 const PROTOCOLS = [
   { value: 'ssh', label: 'SSH', port: 22 },
@@ -23,15 +25,12 @@ const ENVIRONMENTS = [
   { value: 'other', label: 'Other', color: '#8b5cf6' }
 ]
 
-const INFRASTRUCTURE_TYPES = [
-  { value: 'aws', label: 'AWS', icon: '☁️' },
-  { value: 'azure', label: 'Azure', icon: '☁️' },
-  { value: 'gcp', label: 'GCP', icon: '☁️' },
-  { value: 'digitalocean', label: 'DigitalOcean', icon: '☁️' },
-  { value: 'onpremise', label: 'On-Premise', icon: '🏢' },
-  { value: 'internal', label: 'Internal', icon: '🔒' },
-  { value: 'external', label: 'External', icon: '🌐' }
-]
+// Keep for backwards compatibility, but use INFRASTRUCTURE_ICONS for display
+const INFRASTRUCTURE_TYPES = Object.entries(INFRASTRUCTURE_ICONS).map(([value, config]) => ({
+  value,
+  label: config.name,
+  color: config.color
+}))
 
 const AUTH_METHODS = [
   { value: 'password', label: 'Password' },
@@ -55,6 +54,7 @@ const ServerForm = ({ server, folders, onSave, onCancel }) => {
     description: '',
     folderId: null,
     tags: [],
+    color: null, // Server color for visual identification
     // Connection
     hostname: '',
     port: 22,
@@ -64,6 +64,8 @@ const ServerForm = ({ server, folders, onSave, onCancel }) => {
     authMethod: 'password',
     password: '',
     privateKey: '',
+    // SSH Config
+    updateSSHConfig: false, // Option to update system SSH config
     // Classification
     environment: 'development',
     infrastructure: 'internal',
@@ -428,6 +430,42 @@ const ServerForm = ({ server, folders, onSave, onCancel }) => {
                   </p>
                 </div>
               )}
+              
+              {/* SSH Config Option */}
+              {formData.protocol === 'ssh' && (
+                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.updateSSHConfig}
+                      onChange={(e) => handleChange('updateSSHConfig', e.target.checked)}
+                      className="w-4 h-4 rounded accent-[var(--accent)]"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-[var(--text-primary)]">
+                        Add to SSH Config
+                      </div>
+                      <div className="text-xs text-[var(--text-tertiary)]">
+                        Generate SSH config entry for easy terminal access
+                      </div>
+                    </div>
+                  </label>
+                  
+                  {formData.updateSSHConfig && (
+                    <div className="mt-2 p-3 rounded-lg bg-[var(--bg-secondary)] text-xs">
+                      <div className="text-[var(--text-tertiary)] mb-1">Preview:</div>
+                      <pre className="font-mono text-[var(--text-primary)] whitespace-pre-wrap">
+{`Host ${formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-server'}
+    HostName ${formData.hostname || 'hostname'}
+    User ${formData.username || 'user'}${formData.port !== 22 ? `\n    Port ${formData.port}` : ''}`}
+                      </pre>
+                      <p className="text-[var(--text-tertiary)] mt-2">
+                        After saving, use the SSH Config button to copy or download.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -469,25 +507,37 @@ const ServerForm = ({ server, folders, onSave, onCancel }) => {
                 </div>
               </div>
               
+              <InfrastructureSelector 
+                value={formData.infrastructure}
+                onChange={(value) => handleChange('infrastructure', value)}
+              />
+              
+              {/* Server Color */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                  Infrastructure Type
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-4 h-4" />
+                    Server Color
+                  </div>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {INFRASTRUCTURE_TYPES.map(infra => (
+                <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                  Optional: Assign a color for visual identification
+                </p>
+                <div className="flex items-center gap-3">
+                  <ColorPicker
+                    value={formData.color}
+                    onChange={(color) => handleChange('color', color)}
+                    compact
+                  />
+                  {formData.color && (
                     <button
-                      key={infra.value}
                       type="button"
-                      onClick={() => handleChange('infrastructure', infra.value)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        formData.infrastructure === infra.value
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/20'
-                      }`}
+                      onClick={() => handleChange('color', null)}
+                      className="text-xs text-[var(--text-tertiary)] hover:text-red-500"
                     >
-                      {infra.icon} {infra.label}
+                      Clear
                     </button>
-                  ))}
+                  )}
                 </div>
               </div>
               

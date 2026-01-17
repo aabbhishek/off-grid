@@ -276,7 +276,7 @@ export default function Landing() {
       {/* Keyboard shortcuts hint */}
       <motion.section variants={itemVariants} className="py-8 text-center">
         <p className="text-xs text-[var(--text-tertiary)]">
-          Pro tip: Press <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] mx-1">1-5</kbd> 
+          Pro tip: Press <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] mx-1">1-8</kbd> 
           to quickly switch tools, <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] mx-1">D</kbd> 
           for Dev Mode, <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] mx-1">T</kbd> 
           for theme

@@ -847,11 +847,11 @@ function App() {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark')
       }
       
-      // Tool shortcuts (1-6)
+      // Tool shortcuts (1-8)
       if (!e.ctrlKey && !e.metaKey && !e.target.matches('input, textarea')) {
         const num = parseInt(e.key)
-        if (num >= 1 && num <= 6) {
-          const paths = ['/jwt', '/json', '/encode', '/hash', '/uuid', '/ssl']
+        if (num >= 1 && num <= 8) {
+          const paths = ['/jwt', '/json', '/encode', '/hash', '/uuid', '/ssl', '/logs', '/vault']
           window.location.hash = paths[num - 1]
         }
       }

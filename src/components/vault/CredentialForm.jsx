@@ -222,7 +222,16 @@ const CredentialForm = ({ credential, onSave, onCancel }) => {
   const [selectedType, setSelectedType] = useState(credential?.type || null)
   const [name, setName] = useState(credential?.name || '')
   const [notes, setNotes] = useState(credential?.notes || '')
-  const [data, setData] = useState(credential?.data || {})
+  // Support both flattened data and nested data object for backward compatibility
+  const [data, setData] = useState(() => {
+    if (credential?.data) return credential.data
+    if (credential) {
+      // Extract data fields from flattened credential
+      const { id, type, name, notes, data: _, ...rest } = credential
+      return Object.keys(rest).length > 0 ? rest : {}
+    }
+    return {}
+  })
   const [showPassword, setShowPassword] = useState({})
   const [showGenerator, setShowGenerator] = useState(null)
   const [copied, setCopied] = useState(null)
@@ -273,12 +282,14 @@ const CredentialForm = ({ credential, onSave, onCancel }) => {
   
   const handleSubmit = (e) => {
     e.preventDefault()
+    // Flatten data fields onto the credential object for easier access
     onSave({
       id: credential?.id || crypto.randomUUID(),
       type: selectedType,
       name,
       notes,
-      data
+      ...data, // Spread data fields (host, username, password, etc.) directly
+      data // Keep original data object for backward compatibility
     })
   }
   

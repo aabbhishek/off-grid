@@ -15,6 +15,17 @@ const PasswordGenerator = ({ onUse, onClose }) => {
   const [password, setPassword] = useState('')
   const [copied, setCopied] = useState(false)
   
+  // Handle Escape key to close
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose])
+  
   // Password options
   const [options, setOptions] = useState({
     length: 16,

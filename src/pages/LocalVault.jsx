@@ -1,6 +1,7 @@
 // Local Vault - Encrypted Credential Storage
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '../App'
 import {
   Shield, Lock, Unlock, Plus, Search, Folder, FolderPlus, Server, Key,
@@ -8,7 +9,8 @@ import {
   ChevronRight, ChevronDown, Eye, EyeOff, ExternalLink, Terminal,
   MoreVertical, AlertTriangle, Clock, Activity, RefreshCw, Filter,
   Tag, Globe, Database, Cloud, GitBranch, Dices, FileDown, FileUp,
-  HardDrive, Info, FileText, Save, FolderOpen
+  HardDrive, Info, FileText, Save, FolderOpen, Share2, LayoutGrid,
+  List, Table2, Palette
 } from 'lucide-react'
 
 // Import components
@@ -16,6 +18,11 @@ import { VaultCreate, VaultUnlock } from '../components/vault/VaultSetup'
 import ServerForm from '../components/vault/ServerForm'
 import CredentialForm, { CREDENTIAL_TYPES } from '../components/vault/CredentialForm'
 import PasswordGenerator from '../components/vault/PasswordGenerator'
+import ColorPicker, { COLOR_PALETTE, getContrastColor, generateChildColors } from '../components/vault/ColorPicker'
+import CredentialViewer, { ViewModeSelector, CredentialViewModal } from '../components/vault/CredentialViewer'
+import InfrastructureIcon, { InfrastructureSelector, INFRASTRUCTURE_ICONS } from '../components/vault/CloudProviderIcons'
+import ShareModal, { ImportFromShareModal } from '../components/vault/ShareCredentials'
+import { generateSSHConfigEntry, generateSSHConfig, getSSHConfigInstructions, downloadAsFile } from '../utils/sshConfig'
 
 // Import utilities
 import { encrypt, decrypt, generateSalt, deriveKey, generateVerificationToken } from '../utils/vaultCrypto'
@@ -96,6 +103,17 @@ const useClipboard = (timeout = 30000) => {
 
 // Modal Component
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const sizeClasses = {
@@ -139,10 +157,21 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 }
 
 // Server Card Component
-const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encryptionKey }) => {
+const ServerCard = ({ 
+  server, 
+  folders, 
+  onEdit, 
+  onDelete, 
+  onViewCredentials,
+  onShare,
+  onExportSSHConfig,
+  encryptionKey,
+  credentialViewMode = 'row'
+}) => {
   const [expanded, setExpanded] = useState(false)
   const [decryptedData, setDecryptedData] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [localViewMode, setLocalViewMode] = useState(credentialViewMode)
   const { copied, countdown, copy, clear } = useClipboard()
   const { showToast } = useApp()
 
@@ -173,7 +202,7 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
   const healthColor = HEALTH_COLORS[server.healthStatus || 'unknown']
 
   const handleCopySSH = () => {
-    const cmd = `ssh ${decryptedData.username}@${decryptedData.hostname}${decryptedData.port !== 22 ? ` -p ${decryptedData.port}` : ''}`
+    const cmd = `ssh ${decryptedData.username || 'root'}@${decryptedData.hostname}${decryptedData.port !== 22 ? ` -p ${decryptedData.port}` : ''}`
     copy(cmd, 'ssh')
     showToast('SSH command copied!')
   }
@@ -208,8 +237,20 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
           {/* Server Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <Server className="w-4 h-4 text-[var(--text-tertiary)] flex-shrink-0" />
+              {/* Infrastructure Icon */}
+              {decryptedData.infrastructure ? (
+                <InfrastructureIcon type={decryptedData.infrastructure} size="sm" />
+              ) : (
+                <Server className="w-4 h-4 text-[var(--text-tertiary)] flex-shrink-0" />
+              )}
               <h3 className="font-medium text-[var(--text-primary)] truncate">{decryptedData.name}</h3>
+              {/* Server Color Indicator */}
+              {decryptedData.color && (
+                <div 
+                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                  style={{ background: decryptedData.color }}
+                />
+              )}
               <span
                 className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
                 style={{ background: `${envColor}20`, color: envColor }}
@@ -221,6 +262,12 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
               <span className="font-mono">{decryptedData.hostname}</span>
               <span>•</span>
               <span>{decryptedData.protocol?.toUpperCase()}</span>
+              {decryptedData.infrastructure && (
+                <>
+                  <span>•</span>
+                  <span>{INFRASTRUCTURE_ICONS[decryptedData.infrastructure]?.name || decryptedData.infrastructure}</span>
+                </>
+              )}
               {decryptedData.credentials?.length > 0 && (
                 <>
                   <span>•</span>
@@ -232,13 +279,24 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
 
           {/* Actions */}
           <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); handleCopySSH() }}
-              className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--accent)]"
-              title="Copy SSH command"
-            >
-              <Terminal className="w-4 h-4" />
-            </button>
+            {decryptedData.protocol === 'ssh' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCopySSH() }}
+                className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--accent)]"
+                title="Copy SSH command"
+              >
+                <Terminal className="w-4 h-4" />
+              </button>
+            )}
+            {onShare && decryptedData.credentials?.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onShare(server, decryptedData) }}
+                className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--accent)]"
+                title="Share"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(server) }}
               className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--accent)]"
@@ -273,7 +331,7 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
                 </div>
                 <div>
                   <div className="text-xs text-[var(--text-tertiary)]">Username</div>
-                  <div className="font-mono text-sm text-[var(--text-primary)]">{decryptedData.username || '-'}</div>
+                  <div className="font-mono text-sm text-[var(--text-primary)]">{decryptedData.username || 'root'}</div>
                 </div>
                 <div>
                   <div className="text-xs text-[var(--text-tertiary)]">Password</div>
@@ -318,41 +376,26 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
 
               {/* Credentials */}
               {decryptedData.credentials?.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-xs text-[var(--text-tertiary)] font-medium">Credentials</div>
-                  <div className="grid gap-2">
-                    {decryptedData.credentials.map(cred => {
-                      const typeConfig = CREDENTIAL_TYPES[cred.type]
-                      return (
-                        <div
-                          key={cred.id}
-                          className="p-3 rounded-lg bg-[var(--bg-secondary)] flex items-center gap-3"
-                        >
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{ background: `${typeConfig?.color}20` }}
-                          >
-                            {typeConfig?.icon && <typeConfig.icon className="w-4 h-4" style={{ color: typeConfig.color }} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm text-[var(--text-primary)] truncate">{cred.name}</div>
-                            <div className="text-xs text-[var(--text-tertiary)]">{typeConfig?.name}</div>
-                          </div>
-                          <button
-                            onClick={() => onViewCredentials(server, cred)}
-                            className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )
-                    })}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-[var(--text-tertiary)] font-medium">
+                      Credentials ({decryptedData.credentials.length})
+                    </div>
+                    <ViewModeSelector value={localViewMode} onChange={setLocalViewMode} />
                   </div>
+                  
+                  <CredentialViewer
+                    credentials={decryptedData.credentials}
+                    viewMode={localViewMode}
+                    server={decryptedData}
+                    onViewCredential={(cred) => onViewCredentials(server, cred, 'view')}
+                    onEditCredential={(cred) => onViewCredentials(server, cred, 'edit')}
+                  />
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2 border-t border-[var(--border-color)]">
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border-color)]">
                 <button
                   onClick={() => onViewCredentials(server)}
                   className="flex-1 py-2 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] transition-colors flex items-center justify-center gap-2"
@@ -360,6 +403,25 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
                   <Plus className="w-4 h-4" />
                   Add Credential
                 </button>
+                {decryptedData.protocol === 'ssh' && onExportSSHConfig && (
+                  <button
+                    onClick={() => onExportSSHConfig(decryptedData)}
+                    className="py-2 px-4 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] transition-colors flex items-center gap-2"
+                    title="Export SSH Config"
+                  >
+                    <FileText className="w-4 h-4" />
+                    SSH Config
+                  </button>
+                )}
+                {onShare && decryptedData.credentials?.length > 0 && (
+                  <button
+                    onClick={() => onShare(server, decryptedData)}
+                    className="py-2 px-4 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] transition-colors flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share
+                  </button>
+                )}
                 <button
                   onClick={() => onDelete(server)}
                   className="py-2 px-4 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
@@ -378,6 +440,12 @@ const ServerCard = ({ server, folders, onEdit, onDelete, onViewCredentials, encr
 // Main LocalVault Component
 const LocalVault = () => {
   const { showToast, devMode } = useApp()
+  const location = useLocation()
+  const navigate = useNavigate()
+  
+  // Check for incoming share data in URL
+  const [incomingShareData, setIncomingShareData] = useState(null)
+  const [showImportShareModal, setShowImportShareModal] = useState(false)
   
   // Vault state
   const [vaultState, setVaultState] = useState('loading') // loading, create, locked, unlocked
@@ -409,10 +477,49 @@ const LocalVault = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [showImportExport, setShowImportExport] = useState(false)
   const [showGeneratorModal, setShowGeneratorModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showSSHConfigModal, setShowSSHConfigModal] = useState(false)
+  const [showCredentialViewModal, setShowCredentialViewModal] = useState(false)
   
   const [editingServer, setEditingServer] = useState(null)
+  const [editingServerDecrypted, setEditingServerDecrypted] = useState(null)
   const [editingCredential, setEditingCredential] = useState(null)
   const [selectedServer, setSelectedServer] = useState(null)
+  const [shareServerData, setShareServerData] = useState(null) // Decrypted data for sharing
+  const [viewingCredential, setViewingCredential] = useState(null)
+  
+  // View preferences
+  const [credentialViewMode, setCredentialViewMode] = useState('row') // row, cards, table
+  
+  // Check for share parameter in URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    const shareData = searchParams.get('share')
+    if (shareData) {
+      setIncomingShareData(shareData)
+      setShowImportShareModal(true)
+      // Clear the share parameter from URL
+      navigate('/vault', { replace: true })
+    }
+  }, [location.search, navigate])
+  
+  // Decrypt editing server when selected
+  useEffect(() => {
+    const decryptServer = async () => {
+      if (editingServer?.encryptedData && encryptionKey) {
+        try {
+          const decrypted = await decrypt(editingServer.encryptedData, encryptionKey)
+          setEditingServerDecrypted(decrypted)
+        } catch (e) {
+          console.error('Failed to decrypt server:', e)
+          setEditingServerDecrypted(null)
+        }
+      } else {
+        setEditingServerDecrypted(null)
+      }
+    }
+    decryptServer()
+  }, [editingServer, encryptionKey])
   
   // Import state
   const [importData, setImportData] = useState(null)
@@ -648,6 +755,7 @@ const LocalVault = () => {
       
       setShowServerModal(false)
       setEditingServer(null)
+      setEditingServerDecrypted(null)
       showToast(editingServer ? 'Server updated!' : 'Server added!')
       
       // Update stats
@@ -1325,12 +1433,28 @@ const LocalVault = () => {
                   server={server}
                   folders={decryptedFolders}
                   encryptionKey={encryptionKey}
+                  credentialViewMode={credentialViewMode}
                   onEdit={(s) => { setEditingServer(s); setShowServerModal(true) }}
                   onDelete={(s) => setShowDeleteConfirm(s)}
-                  onViewCredentials={(s, cred) => {
+                  onViewCredentials={(s, cred, mode = 'edit') => {
                     setSelectedServer(s)
-                    setEditingCredential(cred || null)
-                    setShowCredentialModal(true)
+                    if (mode === 'view' && cred) {
+                      setViewingCredential(cred)
+                      setShowCredentialViewModal(true)
+                    } else {
+                      setEditingCredential(cred || null)
+                      setShowCredentialModal(true)
+                    }
+                  }}
+                  onShare={(s, decryptedData) => {
+                    setSelectedServer(s)
+                    setShareServerData(decryptedData) // Store decrypted data with credentials
+                    setShowShareModal(true)
+                  }}
+                  onExportSSHConfig={(data) => {
+                    const configEntry = generateSSHConfigEntry(data)
+                    const instructions = getSSHConfigInstructions(configEntry)
+                    setShowSSHConfigModal({ configEntry, instructions })
                   }}
                 />
               ))
@@ -1355,15 +1479,15 @@ const LocalVault = () => {
         {showServerModal && (
           <Modal
             isOpen={showServerModal}
-            onClose={() => { setShowServerModal(false); setEditingServer(null) }}
+            onClose={() => { setShowServerModal(false); setEditingServer(null); setEditingServerDecrypted(null) }}
             title={editingServer ? 'Edit Server' : 'Add Server'}
             size="lg"
           >
             <ServerForm
-              server={editingServer ? null : null} // Would need to decrypt for editing
+              server={editingServerDecrypted}
               folders={decryptedFolders}
               onSave={handleSaveServer}
-              onCancel={() => { setShowServerModal(false); setEditingServer(null) }}
+              onCancel={() => { setShowServerModal(false); setEditingServer(null); setEditingServerDecrypted(null) }}
             />
           </Modal>
         )}
@@ -1492,6 +1616,150 @@ const LocalVault = () => {
           </Modal>
         )}
       </AnimatePresence>
+      
+      {/* SSH Config Modal */}
+      <AnimatePresence>
+        {showSSHConfigModal && (
+          <Modal
+            isOpen={!!showSSHConfigModal}
+            onClose={() => setShowSSHConfigModal(false)}
+            title="SSH Config Entry"
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-[var(--bg-secondary)]">
+                <pre className="text-sm font-mono text-[var(--text-primary)] whitespace-pre-wrap">
+                  {showSSHConfigModal.configEntry}
+                </pre>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-[var(--text-secondary)]">Instructions (Linux/macOS)</h4>
+                <ol className="text-sm text-[var(--text-tertiary)] space-y-1 list-decimal list-inside">
+                  <li>Open: <code className="px-1 rounded bg-[var(--bg-tertiary)]">~/.ssh/config</code></li>
+                  <li>Add the config entry above</li>
+                  <li>Run: <code className="px-1 rounded bg-[var(--bg-tertiary)]">chmod 600 ~/.ssh/config</code></li>
+                </ol>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-[var(--text-secondary)]">Instructions (Windows)</h4>
+                <ol className="text-sm text-[var(--text-tertiary)] space-y-1 list-decimal list-inside">
+                  <li>Open: <code className="px-1 rounded bg-[var(--bg-tertiary)]">%USERPROFILE%\.ssh\config</code></li>
+                  <li>Add the config entry above</li>
+                </ol>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(showSSHConfigModal.configEntry)
+                    showToast('Config copied to clipboard!')
+                  }}
+                  className="flex-1 py-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy Config
+                </button>
+                <button
+                  onClick={() => {
+                    downloadAsFile(showSSHConfigModal.configEntry, 'ssh-config-entry.txt')
+                    showToast('Config downloaded!')
+                  }}
+                  className="flex-1 py-2 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+      
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => { setShowShareModal(false); setShareServerData(null) }}
+        server={shareServerData}
+        credentials={shareServerData?.credentials || []}
+        encryptionKey={encryptionKey}
+      />
+      
+      {/* Import From Share Modal */}
+      <ImportFromShareModal
+        isOpen={showImportShareModal}
+        onClose={() => {
+          setShowImportShareModal(false)
+          setIncomingShareData(null)
+        }}
+        shareData={incomingShareData}
+        onImport={async (importedData) => {
+          try {
+            // If vault is locked, we need to unlock first
+            if (vaultState !== 'unlocked') {
+              showToast('Please unlock your vault first to import credentials', 'warning')
+              return
+            }
+            
+            // Create a new server with the imported credentials
+            if (importedData.server) {
+              const serverData = {
+                ...importedData.server,
+                credentials: importedData.credentials || [],
+                id: crypto.randomUUID(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+              
+              // Encrypt and save
+              const encryptedData = await encrypt(serverData, encryptionKey)
+              const serverRecord = {
+                id: serverData.id,
+                folderId: null,
+                encryptedData,
+                createdAt: serverData.createdAt,
+                updatedAt: serverData.updatedAt
+              }
+              
+              await saveServer(serverRecord)
+              setServers(prev => [...prev, serverRecord])
+              showToast('Credentials imported successfully!')
+            } else if (importedData.credentials?.length > 0) {
+              // Just credentials without server - show them to user
+              showToast(`Received ${importedData.credentials.length} credential(s). Please add them to a server.`, 'info')
+            }
+            
+            setShowImportShareModal(false)
+            setIncomingShareData(null)
+          } catch (err) {
+            console.error('Import failed:', err)
+            showToast('Failed to import credentials: ' + err.message, 'error')
+          }
+        }}
+      />
+      
+      {/* Credential View Modal */}
+      {viewingCredential && (
+        <CredentialViewModal
+          isOpen={showCredentialViewModal}
+          onClose={() => {
+            setShowCredentialViewModal(false)
+            setViewingCredential(null)
+          }}
+          credential={viewingCredential}
+          server={selectedServer}
+          onEdit={(cred) => {
+            setShowCredentialViewModal(false)
+            setViewingCredential(null)
+            setEditingCredential(cred)
+            setShowCredentialModal(true)
+          }}
+          onCopy={(value, field) => {
+            showToast(`${field} copied!`)
+          }}
+        />
+      )}
       
       {/* Import/Export Modal */}
       <AnimatePresence>
@@ -1769,4 +2037,3 @@ const LocalVault = () => {
 }
 
 export default LocalVault
-
