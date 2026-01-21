@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, AlertTriangle, AlertCircle, Info,
   Bug, CheckCircle, Clock, List, Table2, Activity, BarChart3,
   PieChart, RefreshCw, Trash2, Eye, EyeOff, Play, Pause,
-  ArrowUpDown, ChevronsLeft, ChevronsRight, ChevronLeft,
+  ArrowUpDown, ArrowUp, ArrowDown, ChevronsLeft, ChevronsRight, ChevronLeft,
   Calendar, Layers, Zap, GitBranch, FileDown, Settings2,
   Braces, Globe, Server
 } from 'lucide-react'
@@ -102,6 +102,18 @@ javax.mail.MessagingException: Could not connect to SMTP host
 <134>Jan 15 10:23:57 webserver01 nginx[1234]: 192.168.1.104 - - "DELETE /api/cache HTTP/1.1" 204 0
 <129>Jan 15 10:23:58 appserver01 myapp[9012]: CRITICAL: Disk space below 10%
 <134>Jan 15 10:23:59 webserver01 nginx[1234]: 192.168.1.100 - - "GET /api/metrics HTTP/1.1" 200 8192`
+}
+
+// Format display config (for chips/tags)
+const FORMAT_DISPLAY = {
+  log4j: { name: 'Spark/Log4j', color: 'bg-orange-500/20 text-orange-400', icon: '⚡' },
+  python: { name: 'Python', color: 'bg-blue-500/20 text-blue-400', icon: '🐍' },
+  logback: { name: 'Logback', color: 'bg-green-500/20 text-green-400', icon: '☕' },
+  springboot: { name: 'Spring', color: 'bg-emerald-500/20 text-emerald-400', icon: '🍃' },
+  ndjson: { name: 'JSON', color: 'bg-yellow-500/20 text-yellow-400', icon: '{}' },
+  apache: { name: 'Apache', color: 'bg-red-500/20 text-red-400', icon: '🪶' },
+  syslog: { name: 'Syslog', color: 'bg-purple-500/20 text-purple-400', icon: '📋' },
+  generic: { name: 'Generic', color: 'bg-gray-500/20 text-gray-400', icon: '📝' },
 }
 
 // Log format patterns
@@ -200,6 +212,75 @@ const LOG_PATTERNS = {
     }
   },
   
+  // Log4j / Spark / Java short date format: YY/MM/DD HH:mm:ss LEVEL ClassName: message
+  log4j: {
+    name: 'Log4j/Spark',
+    // Matches: 26/01/18 23:39:23 WARN NativeCodeLoader: Unable to load...
+    pattern: /^(\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2})\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+(\S+?):\s*(.*)$/i,
+    detect: (line) => /^\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+/i.test(line),
+    parse: (line) => {
+      const match = line.match(LOG_PATTERNS.log4j.pattern)
+      if (match) {
+        const [, timestamp, level, source, message] = match
+        // Convert YY/MM/DD to full date (assume 2000s)
+        const [datePart, timePart] = timestamp.split(/\s+/)
+        const [yy, mm, dd] = datePart.split('/')
+        const fullYear = parseInt(yy) < 70 ? `20${yy}` : `19${yy}`
+        const fullTimestamp = `${fullYear}-${mm}-${dd} ${timePart}`
+        return { timestamp: fullTimestamp, level: normalizeLevel(level), message, source, fields: { className: source } }
+      }
+      return null
+    }
+  },
+  
+  // Python logging format: YYYY-MM-DD HH:mm:ss - logger - LEVEL - message
+  python: {
+    name: 'Python Logging',
+    // Matches: 2026-01-18 23:39:24 - root - INFO - Logging initialized
+    pattern: /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+-\s+(\S+)\s+-\s+(TRACE|DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\s+-\s+(.*)$/i,
+    detect: (line) => /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+-\s+\S+\s+-\s+(TRACE|DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\s+-\s+/i.test(line),
+    parse: (line) => {
+      const match = line.match(LOG_PATTERNS.python.pattern)
+      if (match) {
+        const [, timestamp, logger, level, message] = match
+        return { timestamp, level: normalizeLevel(level), message, source: logger, fields: { logger } }
+      }
+      return null
+    }
+  },
+  
+  // Logback / SLF4J format: timestamp LEVEL [thread] logger - message
+  logback: {
+    name: 'Logback/SLF4J',
+    // Matches: 2026-01-18 10:15:30.123 INFO [main] com.example.App - Starting
+    pattern: /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+\[([^\]]+)\]\s+(\S+)\s+-\s+(.*)$/i,
+    detect: (line) => /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+\[/.test(line),
+    parse: (line) => {
+      const match = line.match(LOG_PATTERNS.logback.pattern)
+      if (match) {
+        const [, timestamp, level, thread, logger, message] = match
+        return { timestamp, level: normalizeLevel(level), message, source: logger, fields: { thread, logger } }
+      }
+      return null
+    }
+  },
+  
+  // Spring Boot format: timestamp LEVEL pid --- [thread] logger : message
+  springboot: {
+    name: 'Spring Boot',
+    // Matches: 2026-01-18 10:15:30.123  INFO 12345 --- [main] c.e.App : Starting
+    pattern: /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+(\d+)\s+---\s+\[([^\]]+)\]\s+(\S+)\s+:\s+(.*)$/i,
+    detect: (line) => /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+\w+\s+\d+\s+---\s+\[/.test(line),
+    parse: (line) => {
+      const match = line.match(LOG_PATTERNS.springboot.pattern)
+      if (match) {
+        const [, timestamp, level, pid, thread, logger, message] = match
+        return { timestamp, level: normalizeLevel(level), message, source: logger, fields: { pid, thread, logger } }
+      }
+      return null
+    }
+  },
+  
   // Generic timestamp format
   generic: {
     name: 'Generic Timestamp',
@@ -273,26 +354,40 @@ function detectLevelFromMessage(message) {
 
 // Detect stack trace
 function isStackTraceLine(line) {
-  return /^\s+at\s+/.test(line) || // Java/JS
-         /^\s+File\s+"/.test(line) || // Python
-         /^\s+\S+\.\S+\(/.test(line) || // Go
-         /^Traceback\s+\(/.test(line) ||
-         /^Caused by:/.test(line) ||
-         /^\s+\.{3}\s+\d+\s+more/.test(line)
+  // Only detect actual stack trace lines, not config output
+  const trimmed = line.trim()
+  
+  // Java/JS: "at package.Class.method(File.java:123)"
+  if (/^\s+at\s+[\w.$]+\s*\(/.test(line)) return true
+  
+  // Python: '  File "path", line N'
+  if (/^\s+File\s+"/.test(line)) return true
+  
+  // Traceback header
+  if (/^Traceback\s+\(/.test(line)) return true
+  
+  // Java "Caused by:" 
+  if (/^Caused by:/.test(line)) return true
+  
+  // Java "... N more"
+  if (/^\s+\.{3}\s+\d+\s+more/.test(line)) return true
+  
+  return false
 }
 
 // Parse logs with auto-detection
 function parseLogs(content) {
-  const lines = content.split('\n').filter(line => line.trim())
+  // Normalize line endings (handle Windows CRLF, old Mac CR, and Unix LF)
+  const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = normalizedContent.split('\n').filter(line => line.trim())
   if (lines.length === 0) return { entries: [], format: 'empty', stats: {} }
   
   // Sample first 50 lines for format detection
   const sampleSize = Math.min(50, lines.length)
   const sample = lines.slice(0, sampleSize)
   
-  let bestFormat = 'plain'
-  let bestScore = 0
-  
+  // Score all formats and rank them
+  const formatScores = []
   for (const [formatName, format] of Object.entries(LOG_PATTERNS)) {
     if (formatName === 'plain') continue
     
@@ -301,16 +396,24 @@ function parseLogs(content) {
       if (format.detect(line)) score++
     }
     
-    if (score > bestScore) {
-      bestScore = score
-      bestFormat = formatName
+    if (score > 0) {
+      formatScores.push({ name: formatName, format, score })
     }
   }
   
-  const format = LOG_PATTERNS[bestFormat]
+  // Sort by score descending - best format first
+  formatScores.sort((a, b) => b.score - a.score)
+  
+  const bestFormat = formatScores.length > 0 ? formatScores[0].name : 'plain'
+  const bestScore = formatScores.length > 0 ? formatScores[0].score : 0
+  
+  // Get formats to try (all detected formats + fallbacks)
+  const formatsToTry = formatScores.map(f => f.format)
+  
   const entries = []
   let currentStackTrace = []
   let lastEntry = null
+  const formatUsage = {} // Track which formats were used
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -331,17 +434,48 @@ function parseLogs(content) {
     }
     
     let parsed = null
-    try {
-      parsed = format.parse(line, i)
-    } catch (e) {
-      // Parsing threw an error
-      parsed = null
+    let usedFormat = null
+    
+    // Try each detected format in order of confidence
+    for (const format of formatsToTry) {
+      if (format.detect(line)) {
+        try {
+          parsed = format.parse(line, i)
+          if (parsed) {
+            usedFormat = format.name
+            break
+          }
+        } catch (e) {
+          // Try next format
+        }
+      }
+    }
+    
+    // If no detected format worked, try all formats as fallback
+    if (!parsed) {
+      for (const [formatName, format] of Object.entries(LOG_PATTERNS)) {
+        if (formatName === 'plain') continue
+        if (format.detect(line)) {
+          try {
+            parsed = format.parse(line, i)
+            if (parsed) {
+              usedFormat = formatName
+              break
+            }
+          } catch (e) {
+            // Try next format
+          }
+        }
+      }
     }
     
     if (parsed) {
       parsed.raw = line
       parsed.lineNumber = i + 1
       parsed.id = i
+      parsed.detectedFormat = usedFormat
+      // Track format usage
+      formatUsage[usedFormat] = (formatUsage[usedFormat] || 0) + 1
       // Ensure message is always a string
       if (parsed.message && typeof parsed.message === 'object') {
         parsed.message = JSON.stringify(parsed.message)
@@ -375,14 +509,21 @@ function parseLogs(content) {
   const unparsedCount = entries.filter(e => e.level === 'UNPARSED').length
   const parsedEntries = entries.filter(e => e.level !== 'UNPARSED')
   
+  // Determine primary format (most used)
+  const primaryFormat = Object.entries(formatUsage).sort((a, b) => b[1] - a[1])[0]
+  const primaryFormatName = primaryFormat ? LOG_PATTERNS[primaryFormat[0]]?.name : 'Plain Text'
+  const isMixedFormat = Object.keys(formatUsage).length > 1
+  
   const stats = {
     total: entries.length,
     parsed: parsedEntries.length,
     unparsed: unparsedCount,
     byLevel: {},
     timeRange: { start: null, end: null },
-    formatName: format.name,
-    confidence: Math.round((bestScore / sampleSize) * 100)
+    formatName: isMixedFormat ? `Mixed (${Object.keys(formatUsage).length} formats)` : primaryFormatName,
+    formatBreakdown: formatUsage,
+    confidence: Math.round((bestScore / sampleSize) * 100),
+    isMixedFormat
   }
   
   for (const entry of entries) {
@@ -693,9 +834,10 @@ function DebugInfoSection({ title, items, icon, color = 'blue', copyToClipboard 
 }
 
 // Log Entry Component
-function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm, devMode, copyToClipboard }) {
+function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm, devMode, copyToClipboard, showFormatChip }) {
   const levelConfig = LOG_LEVELS[entry.level] || LOG_LEVELS.INFO
   const Icon = levelConfig.icon
+  const formatInfo = entry.detectedFormat ? FORMAT_DISPLAY[entry.detectedFormat] : null
   
   const highlightText = (text) => {
     if (!searchTerm || !text) return text
@@ -749,6 +891,14 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm, devMode, co
             <div className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${levelConfig.bg} ${levelConfig.text}`}>
               {entry.level}
             </div>
+            
+            {/* Format type chip for mixed logs */}
+            {showFormatChip && formatInfo && (
+              <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${formatInfo.color} hidden sm:flex items-center gap-1`} title={`Detected as ${formatInfo.name}`}>
+                <span>{formatInfo.icon}</span>
+                <span className="hidden lg:inline">{formatInfo.name}</span>
+              </div>
+            )}
             
             {entry.timestamp && (
               <span className="text-xs text-[var(--text-tertiary)] font-mono flex-shrink-0 hidden sm:inline">
@@ -873,6 +1023,37 @@ function LogEntry({ entry, expanded, onToggle, onFilter, searchTerm, devMode, co
                           <span className="text-[var(--text-secondary)]">{safeStringify(value).slice(0, 50)}</span>
                         </span>
                       ))}
+                    </div>
+                  )}
+                  
+                  {/* Dev Mode: Entry Details */}
+                  {devMode && entry.detectedFormat && (
+                    <div className="p-3 rounded-lg border border-dashed border-orange-500/30 bg-orange-500/5 space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-orange-400">
+                        <Settings2 className="w-3 h-3" />
+                        <span className="font-medium">Parser Details (Dev Mode)</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div>
+                          <div className="text-[var(--text-tertiary)]">Detected Format</div>
+                          <div className="text-orange-300 font-medium flex items-center gap-1">
+                            {formatInfo && <span>{formatInfo.icon}</span>}
+                            {formatInfo?.name || entry.detectedFormat}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[var(--text-tertiary)]">Line Number</div>
+                          <div className="text-[var(--text-primary)] font-mono">#{entry.lineNumber}</div>
+                        </div>
+                        <div>
+                          <div className="text-[var(--text-tertiary)]">Source</div>
+                          <div className="text-[var(--text-primary)] font-mono truncate">{entry.source || 'N/A'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[var(--text-tertiary)]">Raw Length</div>
+                          <div className="text-[var(--text-primary)] font-mono">{entry.raw?.length || 0} chars</div>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
@@ -1305,9 +1486,13 @@ export default function LogAnalyzer() {
                   ))}
                 </div>
                 
-                <button onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')} className="glass-button text-xs py-1.5 px-2">
-                  <ArrowUpDown className="w-3 h-3" />
-                  <span className="hidden sm:inline">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
+                <button 
+                  onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')} 
+                  className={`glass-button text-xs py-1.5 px-2 ${sortOrder === 'desc' ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : ''}`}
+                  title={sortOrder === 'asc' ? 'Showing oldest first - click to show newest first' : 'Showing newest first - click to show oldest first'}
+                >
+                  {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                  <span className="hidden sm:inline">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
                 </button>
                 
                 <div className="relative group">
@@ -1369,6 +1554,23 @@ export default function LogAnalyzer() {
                 </>
               )}
             </div>
+            
+            {/* Format Legend for mixed logs */}
+            {logs.stats.isMixedFormat && logs.stats.formatBreakdown && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-[var(--text-tertiary)]">Formats:</span>
+                {Object.entries(logs.stats.formatBreakdown).map(([formatKey, count]) => {
+                  const display = FORMAT_DISPLAY[formatKey]
+                  return (
+                    <span key={formatKey} className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${display?.color || 'bg-gray-500/20 text-gray-400'}`}>
+                      <span>{display?.icon || '📄'}</span>
+                      <span>{display?.name || formatKey}</span>
+                      <span className="opacity-60">({count})</span>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
           
           {/* List View */}
@@ -1391,6 +1593,7 @@ export default function LogAnalyzer() {
                       searchTerm={searchTerm}
                       devMode={devMode}
                       copyToClipboard={copyToClipboard}
+                      showFormatChip={logs.stats.isMixedFormat}
                     />
                   ))
                 )}
@@ -1522,6 +1725,21 @@ export default function LogAnalyzer() {
                   <div className="text-[var(--text-primary)] font-medium">{logs.entries.length} entries</div>
                 </div>
               </div>
+              
+              {/* Format breakdown for mixed logs */}
+              {logs.stats.isMixedFormat && logs.stats.formatBreakdown && (
+                <div className="mt-4 pt-4 border-t border-orange-500/20">
+                  <div className="text-[var(--text-tertiary)] text-xs mb-2">Format Breakdown</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(logs.stats.formatBreakdown).map(([formatKey, count]) => (
+                      <div key={formatKey} className="px-2 py-1 rounded bg-orange-500/10 text-orange-300 text-xs flex items-center gap-1">
+                        <span className="font-medium">{LOG_PATTERNS[formatKey]?.name || formatKey}</span>
+                        <span className="text-orange-500">({count})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

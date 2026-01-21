@@ -197,10 +197,28 @@ jobs:
           echo "All processing happens locally in your browser. No data is ever transmitted to any server." >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Determine version bump
-        id: version_bump
+      - name: Calculate semantic version
+        id: semver
         run: |
           LAST_TAG="${{ steps.last_tag.outputs.tag }}"
+          
+          # Extract version numbers from last tag (format: v1.2.3 or 1.2.3)
+          if [ -z "$LAST_TAG" ]; then
+            MAJOR=1
+            MINOR=0
+            PATCH=0
+          else
+            # Remove 'v' prefix if present and any build suffix
+            VERSION=$(echo "$LAST_TAG" | sed 's/^v//' | cut -d'-' -f1)
+            MAJOR=$(echo "$VERSION" | cut -d'.' -f1)
+            MINOR=$(echo "$VERSION" | cut -d'.' -f2)
+            PATCH=$(echo "$VERSION" | cut -d'.' -f3)
+            
+            # Default to 0 if not set
+            MAJOR=${MAJOR:-1}
+            MINOR=${MINOR:-0}
+            PATCH=${PATCH:-0}
+          fi
           
           if [ -z "$LAST_TAG" ]; then
             RANGE="HEAD"
@@ -208,30 +226,44 @@ jobs:
             RANGE="${LAST_TAG}..HEAD"
           fi
           
-          # Check for breaking changes (BREAKING CHANGE in body or ! after type)
+          # Count commits by type
           BREAKING=$(git log $RANGE --grep="BREAKING CHANGE\|^.*!:" --extended-regexp 2>/dev/null | wc -l)
           FEATURES=$(git log $RANGE --grep="^feat" --extended-regexp 2>/dev/null | wc -l)
           FIXES=$(git log $RANGE --grep="^fix" --extended-regexp 2>/dev/null | wc -l)
           
+          # Determine version bump based on semantic versioning
+          # Major.Minor.Patch where Minor = features, Patch = fixes
           if [ "$BREAKING" -gt 0 ]; then
-            echo "bump=major" >> $GITHUB_OUTPUT
-            echo "label=🚨 Breaking Changes" >> $GITHUB_OUTPUT
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            LABEL="🚨 Breaking Changes"
           elif [ "$FEATURES" -gt 0 ]; then
-            echo "bump=minor" >> $GITHUB_OUTPUT
-            echo "label=✨ New Features" >> $GITHUB_OUTPUT
+            MINOR=$((MINOR + FEATURES))
+            LABEL="✨ New Features"
           elif [ "$FIXES" -gt 0 ]; then
-            echo "bump=patch" >> $GITHUB_OUTPUT
-            echo "label=🐛 Bug Fixes" >> $GITHUB_OUTPUT
+            PATCH=$((PATCH + FIXES))
+            LABEL="🐛 Bug Fixes"
           else
-            echo "bump=patch" >> $GITHUB_OUTPUT
-            echo "label=📦 Update" >> $GITHUB_OUTPUT
+            # Default: increment patch for other changes
+            PATCH=$((PATCH + 1))
+            LABEL="📦 Update"
           fi
+          
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+          echo "label=$LABEL" >> $GITHUB_OUTPUT
+          echo "Calculated version: $NEW_VERSION"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.package_version.outputs.version }}-${{ github.run_number }}
-          name: "${{ steps.version_bump.outputs.label }} - v${{ steps.package_version.outputs.version }} (Build #${{ github.run_number }})"
+          tag_name: ${{ steps.semver.outputs.version }}
+          name: "${{ steps.semver.outputs.version }}"
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: false
@@ -242,13 +274,13 @@ jobs:
       - name: Create ZIP artifact
         run: |
           cd dist
-          zip -r ../offgrid-v${{ steps.package_version.outputs.version }}.zip .
+          zip -r ../offgrid-${{ steps.semver.outputs.version }}.zip .
           cd ..
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.package_version.outputs.version }}-${{ github.run_number }}
-          files: offgrid-v${{ steps.package_version.outputs.version }}.zip
+          tag_name: ${{ steps.semver.outputs.version }}
+          files: offgrid-${{ steps.semver.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

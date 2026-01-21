@@ -22,7 +22,10 @@ import ColorPicker, { COLOR_PALETTE, getContrastColor, generateChildColors } fro
 import CredentialViewer, { ViewModeSelector, CredentialViewModal } from '../components/vault/CredentialViewer'
 import InfrastructureIcon, { InfrastructureSelector, INFRASTRUCTURE_ICONS } from '../components/vault/CloudProviderIcons'
 import ShareModal, { ImportFromShareModal } from '../components/vault/ShareCredentials'
-import { generateSSHConfigEntry, generateSSHConfig, getSSHConfigInstructions, downloadAsFile } from '../utils/sshConfig'
+import { 
+  generateSSHConfigEntry, generateSSHConfig, getSSHConfigInstructions, downloadAsFile,
+  generateSSHConfigFilename, saveSSHConfigToFile, getIncludeInstructions, isFileSystemAccessSupported
+} from '../utils/sshConfig'
 
 // Import utilities
 import { encrypt, decrypt, generateSalt, deriveKey, generateVerificationToken } from '../utils/vaultCrypto'
@@ -172,8 +175,9 @@ const ServerCard = ({
   const [decryptedData, setDecryptedData] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
   const [localViewMode, setLocalViewMode] = useState(credentialViewMode)
+  const [showDevInfo, setShowDevInfo] = useState(false)
   const { copied, countdown, copy, clear } = useClipboard()
-  const { showToast } = useApp()
+  const { showToast, devMode } = useApp()
 
   useEffect(() => {
     const decryptServer = async () => {
@@ -394,6 +398,109 @@ const ServerCard = ({
                 </div>
               )}
 
+              {/* Dev Mode: Server Details */}
+              {devMode && (
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setShowDevInfo(!showDevInfo)}
+                    className="flex items-center gap-2 text-xs font-medium text-orange-400 hover:text-orange-300"
+                  >
+                    <Database className="w-3 h-3" />
+                    {showDevInfo ? 'Hide' : 'Show'} Server Details (Dev Mode)
+                    <ChevronDown className={`w-3 h-3 transition-transform ${showDevInfo ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showDevInfo && (
+                    <div className="p-3 rounded-lg border-dashed border-2 border-orange-500/30 bg-orange-500/5 space-y-3">
+                      {/* Storage Info */}
+                      <div>
+                        <div className="text-xs font-semibold text-orange-400 mb-2">Storage Details</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Server ID</div>
+                            <div className="text-[var(--text-primary)] font-mono truncate" title={server.id}>{server.id.slice(0, 8)}...</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Encrypted Size</div>
+                            <div className="text-[var(--text-primary)] font-mono">{server.encryptedData ? `${(JSON.stringify(server.encryptedData).length / 1024).toFixed(2)} KB` : 'N/A'}</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Created</div>
+                            <div className="text-[var(--text-primary)] font-mono">{server.createdAt ? new Date(server.createdAt).toLocaleDateString() : 'N/A'}</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Folder ID</div>
+                            <div className="text-[var(--text-primary)] font-mono truncate" title={server.folderId || 'None'}>{server.folderId ? server.folderId.slice(0, 8) + '...' : 'Root'}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Credential Breakdown */}
+                      {decryptedData.credentials?.length > 0 && (
+                        <div>
+                          <div className="text-xs font-semibold text-orange-400 mb-2">Credential Breakdown</div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            {Object.entries(
+                              decryptedData.credentials.reduce((acc, cred) => {
+                                acc[cred.type] = (acc[cred.type] || 0) + 1
+                                return acc
+                              }, {})
+                            ).map(([type, count]) => (
+                              <div key={type} className="p-2 rounded bg-[var(--bg-tertiary)]">
+                                <div className="text-[var(--text-tertiary)] capitalize">{type}</div>
+                                <div className="text-[var(--text-primary)] font-mono">{count}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Connection Details */}
+                      <div>
+                        <div className="text-xs font-semibold text-orange-400 mb-2">Connection Config</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Protocol</div>
+                            <div className="text-[var(--text-primary)] font-mono uppercase">{decryptedData.protocol || 'SSH'}</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Auth Method</div>
+                            <div className="text-[var(--text-primary)] font-mono capitalize">{decryptedData.authMethod || 'password'}</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Infrastructure</div>
+                            <div className="text-[var(--text-primary)] font-mono capitalize">{decryptedData.infrastructure || 'internal'}</div>
+                          </div>
+                          <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                            <div className="text-[var(--text-tertiary)]">Health Status</div>
+                            <div className="text-[var(--text-primary)] font-mono capitalize">{server.healthStatus || 'unknown'}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Health Check Config */}
+                      {decryptedData.healthCheckUrl && (
+                        <div>
+                          <div className="text-xs font-semibold text-orange-400 mb-2">Health Check Config</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                              <div className="text-[var(--text-tertiary)]">URL</div>
+                              <div className="text-[var(--text-primary)] font-mono break-all">{decryptedData.healthCheckUrl}</div>
+                            </div>
+                            <div className="p-2 rounded bg-[var(--bg-tertiary)]">
+                              <div className="text-[var(--text-tertiary)]">Expected Status / Interval / On Unlock</div>
+                              <div className="text-[var(--text-primary)] font-mono">
+                                {decryptedData.healthCheckExpectedStatus || 200} / {decryptedData.healthCheckInterval || 5}min / {decryptedData.healthCheckOnUnlock ? 'Yes' : 'No'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border-color)]">
                 <button
@@ -434,6 +541,365 @@ const ServerCard = ({
         )}
       </AnimatePresence>
     </motion.div>
+  )
+}
+
+// Health Monitoring View Component
+const HealthMonitoringView = ({
+  servers,
+  encryptionKey,
+  healthResults,
+  healthCheckRunning,
+  isRunningAllHealthChecks,
+  onRunHealthCheck,
+  onRunAllHealthChecks,
+  onEditServer
+}) => {
+  const { showToast, devMode } = useApp()
+  const [decryptedServers, setDecryptedServers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [expandedDevInfo, setExpandedDevInfo] = useState(null) // Track which server's dev info is expanded
+  
+  // Decrypt all servers to get health check URLs
+  useEffect(() => {
+    const decryptAll = async () => {
+      setLoading(true)
+      const results = []
+      
+      for (const server of servers) {
+        if (server.encryptedData && encryptionKey) {
+          try {
+            const data = await decrypt(server.encryptedData, encryptionKey)
+            results.push({ server, data })
+          } catch (e) {
+            console.error('Failed to decrypt server:', e)
+          }
+        }
+      }
+      
+      setDecryptedServers(results)
+      setLoading(false)
+    }
+    
+    decryptAll()
+  }, [servers, encryptionKey])
+  
+  // Filter servers with health check URLs
+  const serversWithHealthCheck = decryptedServers.filter(s => s.data?.healthCheckUrl)
+  const serversWithoutHealthCheck = decryptedServers.filter(s => !s.data?.healthCheckUrl)
+  
+  // Calculate stats
+  const stats = {
+    total: serversWithHealthCheck.length,
+    healthy: serversWithHealthCheck.filter(s => healthResults[s.server.id]?.status === 'healthy').length,
+    degraded: serversWithHealthCheck.filter(s => healthResults[s.server.id]?.status === 'degraded').length,
+    down: serversWithHealthCheck.filter(s => healthResults[s.server.id]?.status === 'down').length,
+    unknown: serversWithHealthCheck.filter(s => !healthResults[s.server.id] || healthResults[s.server.id]?.status === 'unknown').length
+  }
+  
+  const handleRunAllChecks = async () => {
+    if (serversWithHealthCheck.length === 0) {
+      showToast('No servers have health check URLs configured')
+      return
+    }
+    showToast(`Running health checks on ${serversWithHealthCheck.length} server(s)...`)
+    await onRunAllHealthChecks(serversWithHealthCheck)
+    showToast('Health checks completed')
+  }
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+  
+  return (
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
+            <Server className="w-4 h-4" />
+            <span className="text-xs">Total</span>
+          </div>
+          <div className="text-2xl font-bold text-[var(--text-primary)]">{stats.total}</div>
+        </div>
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center gap-2 text-emerald-500 mb-1">
+            <Check className="w-4 h-4" />
+            <span className="text-xs">Healthy</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-500">{stats.healthy}</div>
+        </div>
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center gap-2 text-amber-500 mb-1">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="text-xs">Degraded</span>
+          </div>
+          <div className="text-2xl font-bold text-amber-500">{stats.degraded}</div>
+        </div>
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center gap-2 text-red-500 mb-1">
+            <X className="w-4 h-4" />
+            <span className="text-xs">Down</span>
+          </div>
+          <div className="text-2xl font-bold text-red-500">{stats.down}</div>
+        </div>
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
+            <Clock className="w-4 h-4" />
+            <span className="text-xs">Unknown</span>
+          </div>
+          <div className="text-2xl font-bold text-[var(--text-tertiary)]">{stats.unknown}</div>
+        </div>
+      </div>
+      
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-[var(--text-primary)]">
+          Monitored Servers ({serversWithHealthCheck.length})
+        </h3>
+        <button
+          onClick={handleRunAllChecks}
+          disabled={isRunningAllHealthChecks || serversWithHealthCheck.length === 0}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRunningAllHealthChecks ? 'animate-spin' : ''}`} />
+          {isRunningAllHealthChecks ? 'Checking...' : 'Check All'}
+        </button>
+      </div>
+      
+      {/* Servers with Health Check */}
+      {serversWithHealthCheck.length > 0 ? (
+        <div className="space-y-3">
+          {serversWithHealthCheck.map(({ server, data }) => {
+            const result = healthResults[server.id]
+            const isChecking = healthCheckRunning[server.id]
+            const healthColor = result ? HEALTH_COLORS[result.status] : HEALTH_COLORS.unknown
+            
+            return (
+              <motion.div
+                key={server.id}
+                layout
+                className="glass-card rounded-xl p-4"
+              >
+                <div className="flex items-center gap-4">
+                  {/* Status Indicator */}
+                  <div
+                    className={`w-3 h-3 rounded-full flex-shrink-0 ${isChecking ? 'animate-pulse' : ''}`}
+                    style={{ background: healthColor }}
+                  />
+                  
+                  {/* Server Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-[var(--text-primary)] truncate">{data.name}</h4>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ background: `${ENV_COLORS[data.environment] || ENV_COLORS.other}20`, color: ENV_COLORS[data.environment] || ENV_COLORS.other }}
+                      >
+                        {data.environment}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)] truncate mt-1">
+                      {data.healthCheckUrl}
+                    </div>
+                  </div>
+                  
+                  {/* Health Result */}
+                  <div className="text-right flex-shrink-0 max-w-[220px]">
+                    {result ? (
+                      <>
+                        <div className="text-sm font-medium" style={{ color: healthColor }}>
+                          {result.status === 'healthy' && 'Healthy'}
+                          {result.status === 'degraded' && 'Degraded'}
+                          {result.status === 'down' && 'Down'}
+                          {result.status === 'unknown' && 'Unknown'}
+                        </div>
+                        <div className="text-xs text-[var(--text-tertiary)]">
+                          {result.responseTime}ms • {result.statusCode && `${result.statusCode} • `}
+                          {new Date(result.lastCheck).toLocaleTimeString()}
+                        </div>
+                        {result.method && result.method !== 'cors' && (
+                          <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
+                            via {result.method === 'no-cors' ? 'indirect check' : result.method === 'image-probe' ? 'image probe' : result.method}
+                          </div>
+                        )}
+                        {result.note && (
+                          <div className="text-[10px] text-[var(--accent)] mt-0.5 truncate" title={result.note}>
+                            {result.note}
+                          </div>
+                        )}
+                        {result.error && (
+                          <div className="text-xs text-red-400 mt-1 truncate" title={result.error}>
+                            {result.error}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-sm text-[var(--text-tertiary)]">Not checked</div>
+                    )}
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    {devMode && result && (
+                      <button
+                        onClick={() => setExpandedDevInfo(expandedDevInfo === server.id ? null : server.id)}
+                        className={`p-2 rounded-lg hover:bg-[var(--bg-tertiary)] ${expandedDevInfo === server.id ? 'text-orange-400' : 'text-[var(--text-secondary)]'} hover:text-orange-400`}
+                        title="Dev Info"
+                      >
+                        <Activity className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onRunHealthCheck(server.id, data)}
+                      disabled={isChecking}
+                      className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-50"
+                      title="Run health check"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                      onClick={() => onEditServer(server)}
+                      className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                      title="Edit server"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <a
+                      href={data.healthCheckUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                      title="Open URL"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+                
+                {/* Dev Mode: Health Check Details */}
+                {devMode && expandedDevInfo === server.id && result && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-orange-500/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Activity className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs font-semibold text-orange-400">Health Check Details (Dev Mode)</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Detection Method</div>
+                        <div className="text-[var(--text-primary)] font-mono">
+                          {result.method === 'cors' && 'Direct CORS'}
+                          {result.method === 'no-cors' && 'No-CORS Mode'}
+                          {result.method === 'image-probe' && 'Image Probe'}
+                          {result.method === 'all-failed' && 'All Methods Failed'}
+                        </div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Response Time</div>
+                        <div className="text-[var(--text-primary)] font-mono">{result.responseTime}ms</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Status Code</div>
+                        <div className="text-[var(--text-primary)] font-mono">{result.statusCode || 'N/A'}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Last Check</div>
+                        <div className="text-[var(--text-primary)] font-mono">{new Date(result.lastCheck).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Health Check URL</div>
+                        <div className="text-[var(--text-primary)] font-mono break-all">{data.healthCheckUrl}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-[var(--bg-tertiary)]">
+                        <div className="text-[var(--text-tertiary)]">Expected Status</div>
+                        <div className="text-[var(--text-primary)] font-mono">{data.healthCheckExpectedStatus || 200}</div>
+                      </div>
+                    </div>
+                    {result.error && (
+                      <div className="mt-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <div className="text-red-400 text-xs">
+                          <span className="font-semibold">Error:</span> {result.error}
+                        </div>
+                      </div>
+                    )}
+                    {result.note && (
+                      <div className="mt-3 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                        <div className="text-orange-400 text-xs">
+                          <span className="font-semibold">Note:</span> {result.note}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="glass-card rounded-2xl p-8 text-center">
+          <Heart className="w-12 h-12 mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">No Health Checks Configured</h3>
+          <p className="text-[var(--text-secondary)] mb-4">
+            Add a health check URL to your servers to monitor their availability.
+          </p>
+        </div>
+      )}
+      
+      {/* Servers without Health Check */}
+      {serversWithoutHealthCheck.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">
+            Servers without Health Monitoring ({serversWithoutHealthCheck.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {serversWithoutHealthCheck.map(({ server, data }) => (
+              <div
+                key={server.id}
+                className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Server className="w-4 h-4 text-[var(--text-tertiary)] flex-shrink-0" />
+                  <span className="text-sm text-[var(--text-secondary)] truncate">{data.name}</span>
+                </div>
+                <button
+                  onClick={() => onEditServer(server)}
+                  className="text-xs text-[var(--accent)] hover:underline flex-shrink-0"
+                >
+                  Configure
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Info Note */}
+      <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+        <div className="flex gap-3">
+          <Info className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-[var(--text-secondary)]">
+            <p className="font-medium text-[var(--text-primary)] mb-2">How Health Checks Work</p>
+            <p className="mb-2">
+              Health checks run entirely in your browser using multiple detection methods:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li><strong>Direct request</strong> — Standard CORS request (most accurate when supported)</li>
+              <li><strong>Indirect check</strong> — Detects if server responds without reading content</li>
+              <li><strong>Image probe</strong> — Tests reachability via favicon loading</li>
+            </ul>
+            <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+              💡 For best results, enable CORS on your health endpoints with: <code className="px-1 rounded bg-[var(--bg-tertiary)]">Access-Control-Allow-Origin: *</code>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -490,6 +956,12 @@ const LocalVault = () => {
   
   // View preferences
   const [credentialViewMode, setCredentialViewMode] = useState('row') // row, cards, table
+  
+  // Health monitoring state
+  const [healthResults, setHealthResults] = useState({}) // { serverId: { status, lastCheck, responseTime, error } }
+  const [healthCheckRunning, setHealthCheckRunning] = useState({}) // { serverId: true/false }
+  const [isRunningAllHealthChecks, setIsRunningAllHealthChecks] = useState(false)
+  const healthCheckIntervalRef = useRef(null)
   
   // Check for share parameter in URL
   useEffect(() => {
@@ -649,6 +1121,205 @@ const LocalVault = () => {
     }
   }, [vaultState, resetLockTimer])
   
+  // Health check function with multiple fallback methods for CORS workaround
+  const performHealthCheck = useCallback(async (serverId, serverData) => {
+    if (!serverData?.healthCheckUrl) {
+      return { status: 'unknown', error: 'No health check URL configured' }
+    }
+    
+    setHealthCheckRunning(prev => ({ ...prev, [serverId]: true }))
+    
+    const startTime = performance.now()
+    const expectedStatus = serverData.healthCheckExpectedStatus || 200
+    
+    // Method 1: Try normal CORS request first
+    const tryCorsRequest = async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 8000)
+      
+      try {
+        const response = await fetch(serverData.healthCheckUrl, {
+          method: 'GET',
+          mode: 'cors',
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json, text/plain, */*' }
+        })
+        
+        clearTimeout(timeoutId)
+        const responseTime = Math.round(performance.now() - startTime)
+        
+        return {
+          success: true,
+          status: response.status === expectedStatus ? 'healthy' : (response.status >= 500 ? 'down' : 'degraded'),
+          statusCode: response.status,
+          responseTime,
+          error: response.status !== expectedStatus ? `Expected ${expectedStatus}, got ${response.status}` : null,
+          method: 'cors'
+        }
+      } catch (err) {
+        clearTimeout(timeoutId)
+        if (err.name === 'AbortError') {
+          return { success: false, error: 'timeout' }
+        }
+        return { success: false, error: 'cors', responseTime: Math.round(performance.now() - startTime) }
+      }
+    }
+    
+    // Method 2: no-cors mode - can detect if server responds at all
+    const tryNoCorsRequest = async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 8000)
+      
+      try {
+        const noCorsStart = performance.now()
+        const response = await fetch(serverData.healthCheckUrl, {
+          method: 'GET',
+          mode: 'no-cors',
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+        const responseTime = Math.round(performance.now() - noCorsStart)
+        
+        // no-cors returns opaque response, but if we get here, server responded
+        // Fast response (<2s) = server is likely healthy
+        // Slow response (>2s) = server might be degraded
+        return {
+          success: true,
+          status: responseTime < 2000 ? 'healthy' : 'degraded',
+          responseTime,
+          method: 'no-cors',
+          note: 'Detected via no-cors (status unknown)'
+        }
+      } catch (err) {
+        clearTimeout(timeoutId)
+        if (err.name === 'AbortError') {
+          return { success: false, error: 'timeout' }
+        }
+        return { success: false, error: 'network' }
+      }
+    }
+    
+    // Method 3: Image probe - try to load favicon or any image
+    const tryImageProbe = async () => {
+      return new Promise((resolve) => {
+        const img = new Image()
+        const imgStart = performance.now()
+        const timeout = setTimeout(() => {
+          img.src = ''
+          resolve({ success: false, error: 'timeout' })
+        }, 5000)
+        
+        // Try to load favicon from the same origin
+        const url = new URL(serverData.healthCheckUrl)
+        const faviconUrl = `${url.origin}/favicon.ico`
+        
+        img.onload = () => {
+          clearTimeout(timeout)
+          resolve({
+            success: true,
+            status: 'healthy',
+            responseTime: Math.round(performance.now() - imgStart),
+            method: 'image-probe'
+          })
+        }
+        
+        img.onerror = () => {
+          clearTimeout(timeout)
+          // Error could mean: 1) no favicon but server is up, or 2) server is down
+          // If error is fast (<500ms), server likely responded (just no favicon)
+          const elapsed = performance.now() - imgStart
+          if (elapsed < 500) {
+            resolve({
+              success: true,
+              status: 'healthy',
+              responseTime: Math.round(elapsed),
+              method: 'image-probe',
+              note: 'Server responded (no favicon)'
+            })
+          } else {
+            resolve({ success: false, error: 'no-response' })
+          }
+        }
+        
+        img.src = faviconUrl
+      })
+    }
+    
+    // Execute methods in order with fallback
+    let result = await tryCorsRequest()
+    
+    if (!result.success) {
+      // CORS failed, try no-cors mode
+      result = await tryNoCorsRequest()
+    }
+    
+    if (!result.success) {
+      // no-cors failed, try image probe
+      result = await tryImageProbe()
+    }
+    
+    const responseTime = result.responseTime || Math.round(performance.now() - startTime)
+    
+    let finalResult
+    if (result.success) {
+      finalResult = {
+        status: result.status,
+        lastCheck: Date.now(),
+        responseTime,
+        statusCode: result.statusCode,
+        error: result.error,
+        method: result.method,
+        note: result.note
+      }
+    } else {
+      // All methods failed
+      finalResult = {
+        status: result.error === 'timeout' ? 'down' : 'down',
+        lastCheck: Date.now(),
+        responseTime,
+        error: result.error === 'timeout' ? 'Request timed out' : 'Server unreachable',
+        method: 'all-failed'
+      }
+    }
+    
+    setHealthResults(prev => ({ ...prev, [serverId]: finalResult }))
+    setHealthCheckRunning(prev => ({ ...prev, [serverId]: false }))
+    
+    return finalResult
+  }, [])
+  
+  // Run health checks on all servers
+  const runAllHealthChecks = useCallback(async (serversWithData) => {
+    setIsRunningAllHealthChecks(true)
+    
+    const serversToCheck = serversWithData.filter(s => s.data?.healthCheckUrl)
+    
+    // Run checks in parallel but limit concurrency
+    const results = {}
+    for (const { server, data } of serversToCheck) {
+      const result = await performHealthCheck(server.id, data)
+      results[server.id] = result
+    }
+    
+    setIsRunningAllHealthChecks(false)
+    return results
+  }, [performHealthCheck])
+  
+  // Update server health status in database
+  const updateServerHealthStatus = useCallback(async (serverId, status) => {
+    try {
+      const server = servers.find(s => s.id === serverId)
+      if (server) {
+        const updatedServer = { ...server, healthStatus: status }
+        await saveServer(updatedServer)
+        setServers(prev => prev.map(s => s.id === serverId ? updatedServer : s))
+      }
+    } catch (e) {
+      console.error('Failed to update health status:', e)
+    }
+  }, [servers])
+  
   // Handlers
   const handleVaultCreated = (key, type, metadata) => {
     setEncryptionKey(key)
@@ -665,10 +1336,13 @@ const LocalVault = () => {
     setVaultState('unlocked')
     showToast('Vault unlocked!')
     
+    let loadedServers = []
+    
     // For file storage, data comes from the unlock
     if (storageType === 'file' && data) {
       // Load data from file
-      setServers(data.servers || [])
+      loadedServers = data.servers || []
+      setServers(loadedServers)
       setFolders(data.folders || [])
       
       // Decrypt folder names
@@ -688,15 +1362,39 @@ const LocalVault = () => {
       setDecryptedFolders(decrypted)
       
       setVaultStats({
-        serverCount: (data.servers || []).length,
+        serverCount: loadedServers.length,
         folderCount: (data.folders || []).length,
-        credentialCount: (data.servers || []).reduce((sum, s) => sum + (s.credentials?.length || 0), 0)
+        credentialCount: loadedServers.reduce((sum, s) => sum + (s.credentials?.length || 0), 0)
       })
     } else {
       // Refresh stats from IndexedDB
       const stats = await getVaultStats()
       setVaultStats(stats)
+      loadedServers = await getAllServers()
     }
+    
+    // Run health checks on unlock if enabled
+    setTimeout(async () => {
+      const serversWithHealthCheck = []
+      
+      for (const server of loadedServers) {
+        if (server.encryptedData) {
+          try {
+            const serverData = await decrypt(server.encryptedData, key)
+            if (serverData.healthCheckUrl && serverData.healthCheckOnUnlock) {
+              serversWithHealthCheck.push({ server, data: serverData })
+            }
+          } catch (e) {
+            console.error('Failed to decrypt server for health check:', e)
+          }
+        }
+      }
+      
+      if (serversWithHealthCheck.length > 0) {
+        showToast(`Running health checks on ${serversWithHealthCheck.length} server(s)...`)
+        await runAllHealthChecks(serversWithHealthCheck)
+      }
+    }, 500) // Small delay to let the UI settle
   }
   
   const handleLock = () => {
@@ -707,6 +1405,13 @@ const LocalVault = () => {
     setDecryptedFolders([])
     setVaultState('locked')
     setSaveStatus('saved')
+    // Clear health monitoring state
+    setHealthResults({})
+    setHealthCheckRunning({})
+    setIsRunningAllHealthChecks(false)
+    if (healthCheckIntervalRef.current) {
+      clearInterval(healthCheckIntervalRef.current)
+    }
     showToast('Vault locked')
   }
   
@@ -1454,7 +2159,7 @@ const LocalVault = () => {
                   onExportSSHConfig={(data) => {
                     const configEntry = generateSSHConfigEntry(data)
                     const instructions = getSSHConfigInstructions(configEntry)
-                    setShowSSHConfigModal({ configEntry, instructions })
+                    setShowSSHConfigModal({ configEntry, instructions, serverName: data.name })
                   }}
                 />
               ))
@@ -1465,13 +2170,16 @@ const LocalVault = () => {
       
       {/* Health View */}
       {view === 'health' && (
-        <div className="glass-card rounded-2xl p-6 text-center">
-          <Heart className="w-12 h-12 mx-auto mb-4 text-[var(--text-tertiary)]" />
-          <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">Health Monitoring</h3>
-          <p className="text-[var(--text-secondary)]">
-            Configure health check URLs in your servers to monitor their status.
-          </p>
-        </div>
+        <HealthMonitoringView
+          servers={servers}
+          encryptionKey={encryptionKey}
+          healthResults={healthResults}
+          healthCheckRunning={healthCheckRunning}
+          isRunningAllHealthChecks={isRunningAllHealthChecks}
+          onRunHealthCheck={performHealthCheck}
+          onRunAllHealthChecks={runAllHealthChecks}
+          onEditServer={(server) => { setEditingServer(server); setShowServerModal(true) }}
+        />
       )}
       
       {/* Server Modal */}
@@ -1627,30 +2335,76 @@ const LocalVault = () => {
             size="md"
           >
             <div className="space-y-4">
+              {/* Config Preview */}
               <div className="p-4 rounded-lg bg-[var(--bg-secondary)]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-[var(--text-tertiary)]">
+                    {generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}
+                  </span>
+                </div>
                 <pre className="text-sm font-mono text-[var(--text-primary)] whitespace-pre-wrap">
                   {showSSHConfigModal.configEntry}
                 </pre>
               </div>
               
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-[var(--text-secondary)]">Instructions (Linux/macOS)</h4>
-                <ol className="text-sm text-[var(--text-tertiary)] space-y-1 list-decimal list-inside">
-                  <li>Open: <code className="px-1 rounded bg-[var(--bg-tertiary)]">~/.ssh/config</code></li>
-                  <li>Add the config entry above</li>
-                  <li>Run: <code className="px-1 rounded bg-[var(--bg-tertiary)]">chmod 600 ~/.ssh/config</code></li>
-                </ol>
+              {/* Save Options */}
+              <div className="p-4 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+                  <Save className="w-4 h-4 text-[var(--accent)]" />
+                  Save SSH Config File
+                </h4>
+                <p className="text-xs text-[var(--text-tertiary)] mb-3">
+                  Save as a separate config file that can be included in your main SSH config.
+                </p>
+                <button
+                  onClick={async () => {
+                    const result = await saveSSHConfigToFile(
+                      showSSHConfigModal.configEntry,
+                      showSSHConfigModal.serverName || 'server'
+                    )
+                    if (result.success) {
+                      if (result.method === 'filesystem') {
+                        showToast(`Saved to ${result.filename}`)
+                      } else if (result.method === 'download') {
+                        showToast(`Downloaded ${result.filename}`)
+                      }
+                    } else if (result.method !== 'cancelled') {
+                      showToast('Failed to save: ' + result.error)
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Save as {generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}
+                </button>
               </div>
               
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-[var(--text-secondary)]">Instructions (Windows)</h4>
-                <ol className="text-sm text-[var(--text-tertiary)] space-y-1 list-decimal list-inside">
-                  <li>Open: <code className="px-1 rounded bg-[var(--bg-tertiary)]">%USERPROFILE%\.ssh\config</code></li>
-                  <li>Add the config entry above</li>
-                </ol>
+              {/* Include Instructions */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-[var(--text-secondary)]">How to use this file</h4>
+                
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)]">
+                  <div className="text-xs font-medium text-[var(--text-primary)] mb-2">Linux / macOS</div>
+                  <ol className="text-xs text-[var(--text-tertiary)] space-y-1.5">
+                    <li>1. Move file to: <code className="px-1 rounded bg-[var(--bg-tertiary)]">~/.ssh/{generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}</code></li>
+                    <li>2. Add to <code className="px-1 rounded bg-[var(--bg-tertiary)]">~/.ssh/config</code>:</li>
+                    <li className="pl-4"><code className="px-2 py-1 rounded bg-[var(--bg-tertiary)] block">Include ~/.ssh/{generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}</code></li>
+                    <li>3. Set permissions: <code className="px-1 rounded bg-[var(--bg-tertiary)]">chmod 600 ~/.ssh/{generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}</code></li>
+                  </ol>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-[var(--bg-secondary)]">
+                  <div className="text-xs font-medium text-[var(--text-primary)] mb-2">Windows</div>
+                  <ol className="text-xs text-[var(--text-tertiary)] space-y-1.5">
+                    <li>1. Move file to: <code className="px-1 rounded bg-[var(--bg-tertiary)]">%USERPROFILE%\.ssh\{generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}</code></li>
+                    <li>2. Add to <code className="px-1 rounded bg-[var(--bg-tertiary)]">%USERPROFILE%\.ssh\config</code>:</li>
+                    <li className="pl-4"><code className="px-2 py-1 rounded bg-[var(--bg-tertiary)] block">Include {generateSSHConfigFilename(showSSHConfigModal.serverName || 'server')}</code></li>
+                  </ol>
+                </div>
               </div>
               
-              <div className="flex gap-3">
+              {/* Alternative Actions */}
+              <div className="flex gap-3 pt-2 border-t border-[var(--border-color)]">
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(showSSHConfigModal.configEntry)
@@ -1659,17 +2413,17 @@ const LocalVault = () => {
                   className="flex-1 py-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] flex items-center justify-center gap-2"
                 >
                   <Copy className="w-4 h-4" />
-                  Copy Config
+                  Copy
                 </button>
                 <button
                   onClick={() => {
                     downloadAsFile(showSSHConfigModal.configEntry, 'ssh-config-entry.txt')
                     showToast('Config downloaded!')
                   }}
-                  className="flex-1 py-2 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center gap-2"
+                  className="flex-1 py-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent)] flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download
+                  Download .txt
                 </button>
               </div>
             </div>

@@ -81,6 +81,107 @@ const getBrowserInfo = () => {
   return { name: 'Browser', platform: 'unknown' }
 }
 
+// Detect OS
+const getOSInfo = () => {
+  const ua = navigator.userAgent
+  const platform = navigator.platform || ''
+  
+  // Check for iOS
+  if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
+    return { os: 'ios', name: 'iOS' }
+  }
+  
+  // Check for macOS
+  if (platform.startsWith('Mac') || /Macintosh/.test(ua)) {
+    return { os: 'macos', name: 'macOS' }
+  }
+  
+  // Check for Windows
+  if (platform.startsWith('Win') || /Windows/.test(ua)) {
+    return { os: 'windows', name: 'Windows' }
+  }
+  
+  // Check for Android
+  if (/Android/.test(ua)) {
+    return { os: 'android', name: 'Android' }
+  }
+  
+  // Check for Linux distros
+  if (/Linux/.test(ua) || platform.startsWith('Linux')) {
+    // Check for specific distros
+    if (/Ubuntu/.test(ua)) return { os: 'ubuntu', name: 'Ubuntu' }
+    if (/Fedora/.test(ua)) return { os: 'fedora', name: 'Fedora' }
+    if (/Debian/.test(ua)) return { os: 'debian', name: 'Debian' }
+    if (/Arch/.test(ua)) return { os: 'arch', name: 'Arch Linux' }
+    if (/CentOS/.test(ua)) return { os: 'centos', name: 'CentOS' }
+    if (/Red Hat/.test(ua)) return { os: 'redhat', name: 'Red Hat' }
+    return { os: 'linux', name: 'Linux' }
+  }
+  
+  // Check for ChromeOS
+  if (/CrOS/.test(ua)) {
+    return { os: 'chromeos', name: 'ChromeOS' }
+  }
+  
+  // Check for FreeBSD
+  if (/FreeBSD/.test(ua)) {
+    return { os: 'freebsd', name: 'FreeBSD' }
+  }
+  
+  return { os: 'unknown', name: 'Unknown' }
+}
+
+// OS Icons as SVG components
+const OSIcon = ({ os, className = "w-4 h-4" }) => {
+  switch (os) {
+    case 'windows':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+        </svg>
+      )
+    case 'macos':
+    case 'ios':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        </svg>
+      )
+    case 'linux':
+    case 'ubuntu':
+    case 'debian':
+    case 'fedora':
+    case 'arch':
+    case 'centos':
+    case 'redhat':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.504 0c-.155 0-.311.004-.466.014-.956.057-1.857.285-2.694.638-.238.1-.475.21-.708.327-.241.122-.477.255-.704.39-.037.022-.07.046-.106.069-.04.025-.079.052-.117.079a7.53 7.53 0 00-.628.482c-.157.132-.31.27-.457.412a6.926 6.926 0 00-.633.683c-.085.102-.168.205-.248.311-.069.093-.137.187-.201.283-.058.086-.115.173-.168.261-.05.086-.098.173-.143.261-.044.088-.085.177-.124.266a5.37 5.37 0 00-.2.502c-.042.127-.08.256-.115.385a4.44 4.44 0 00-.079.396c-.02.129-.036.258-.048.387-.006.062-.012.124-.016.187v.194c0 .1.002.198.009.296.002.03.004.061.008.092.018.203.047.405.087.605.014.068.028.135.044.202.035.144.077.287.124.428.024.069.048.137.074.206.099.267.216.527.352.78.024.046.05.092.077.137.09.152.186.3.29.446.081.115.168.227.259.336.091.109.187.215.288.318.1.103.206.203.316.3.11.097.225.191.344.282l.116.084c.068.05.137.1.208.147.131.087.266.17.406.25.14.078.285.152.435.222.15.07.304.135.463.196.16.061.324.119.492.172.168.053.34.102.517.147.178.045.36.086.546.123.187.037.378.069.573.098.195.029.394.054.596.075.202.021.408.038.618.05.21.013.422.021.637.025h.181c.094.003.19.004.287.004zm-4.65 12.666c-.197-.295-.197-.644 0-.938l.77-1.156c.197-.295.52-.47.866-.47h1.538c.347 0 .67.175.866.47l.77 1.156c.197.294.197.643 0 .938l-.77 1.155c-.196.295-.52.47-.866.47h-1.538c-.346 0-.67-.175-.866-.47zm3.994-4.158c-.296 0-.569-.175-.716-.44L9.54 5.3c-.147-.265-.147-.615 0-.88l1.592-2.768c.147-.266.42-.44.716-.44h3.183c.296 0 .57.174.717.44l1.591 2.768c.147.265.147.615 0 .88l-1.591 2.768c-.147.265-.42.44-.717.44zm-2.73 7.988c-.296 0-.57-.175-.717-.44L6.81 13.288c-.147-.265-.147-.615 0-.88l1.591-2.768c.147-.265.42-.44.717-.44h3.183c.296 0 .57.175.717.44l1.591 2.768c.147.265.147.615 0 .88l-1.591 2.768c-.147.265-.42.44-.717.44z"/>
+        </svg>
+      )
+    case 'android':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.523 15.341c-.5 0-.91-.41-.91-.91s.41-.91.91-.91.91.41.91.91-.41.91-.91.91m-11.046 0c-.5 0-.91-.41-.91-.91s.41-.91.91-.91.91.41.91.91-.41.91-.91.91m11.4-6.02l1.97-3.41c.11-.19.045-.43-.145-.54-.19-.11-.43-.045-.54.145l-2 3.46c-1.53-.7-3.25-1.09-5.06-1.09s-3.53.39-5.06 1.09l-2-3.46c-.11-.19-.35-.255-.54-.145-.19.11-.255.35-.145.54l1.97 3.41C2.89 11.09.5 14.42.5 18.28h23c0-3.86-2.39-7.19-5.63-8.96"/>
+        </svg>
+      )
+    case 'chromeos':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 18c-3.314 0-6-2.686-6-6s2.686-6 6-6 6 2.686 6 6-2.686 6-6 6zm0-9c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z"/>
+        </svg>
+      )
+    case 'freebsd':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M23.2 6.5c-.3-.6-.8-1-1.4-1.2-.1 0-.2-.1-.3-.1-.4-.1-.7 0-1.1.1-1.1.3-2.1 1.1-2.8 2-.3.4-.5.8-.6 1.2-.3 1-.2 2 .3 2.9.4.7 1 1.2 1.7 1.5.1 0 .2.1.3.1.6.2 1.2.1 1.8-.1 1-.4 1.9-1.2 2.4-2.2.3-.6.5-1.2.5-1.8.1-.9-.2-1.7-.8-2.4zm-4.3-1c-.5-.4-1.2-.5-1.8-.4-.2 0-.4.1-.6.2-.8.3-1.4.9-1.8 1.6-.2.4-.3.8-.3 1.2-.1.9.2 1.8.8 2.4.5.5 1.1.8 1.8.8h.2c.6 0 1.2-.2 1.7-.5.7-.5 1.2-1.2 1.4-2 .1-.4.1-.8.1-1.2-.1-.8-.6-1.6-1.3-2.1h-.2zM6.2 3.4c-.2-.6-.5-1.2-1-1.6-.3-.3-.7-.5-1.1-.6C3.7 1 3.3 1 2.8 1c-.5 0-1 .1-1.4.3-.3.1-.5.3-.7.5-.3.3-.5.6-.7 1 0 .1-.1.2-.1.3 0 .1-.1.2-.1.3 0 .2-.1.5 0 .7v.1c0 .2.1.4.2.6.1.1.1.2.2.3.5.7 1.3 1.2 2.2 1.3h.3c.3 0 .6 0 .9-.1.7-.2 1.4-.5 1.9-1.1.3-.3.5-.7.6-1.1.1-.2.1-.5.1-.7 0-.1 0-.3-.1-.4l.1-.3zm6.9 6.1c-.9-.2-1.9.1-2.6.6-.3.2-.5.5-.7.8-.1.1-.1.2-.2.4-.4.8-.4 1.7-.1 2.5.1.2.2.4.3.5.5.7 1.2 1.2 2 1.4.2 0 .3.1.5.1.7.1 1.3-.1 1.9-.4.7-.4 1.3-1 1.6-1.8.2-.5.3-1 .2-1.6-.1-.6-.3-1.1-.7-1.6-.5-.6-1.3-1-2.2-.9zm-.5 4.2c-.7 0-1.3-.6-1.3-1.3 0-.7.6-1.3 1.3-1.3.7 0 1.3.6 1.3 1.3 0 .8-.6 1.3-1.3 1.3zm-.1 5.9c-3.9 0-7.3-2.7-8.2-6.4-.1-.5-.2-1.1-.2-1.7 0-1.5.4-2.9 1.1-4.1l4.6 2.7c-.2.5-.3 1-.3 1.5 0 1.8 1.3 3.3 3 3.5v4.5z"/>
+        </svg>
+      )
+    default:
+      return <Monitor className={className} />
+  }
+}
+
 // Install Modal Component
 const InstallModal = ({ isOpen, onClose, deferredPrompt, setDeferredPrompt }) => {
   const { showToast } = useApp()
@@ -679,6 +780,7 @@ const HeaderInstallButton = ({ deferredPrompt, isInstalled, onShowModal }) => {
 // Header component
 const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt, isInstalled, onShowInstallModal }) => {
   const { isOnline } = useApp()
+  const osInfo = getOSInfo()
 
   return (
     <header className="sticky top-0 z-[60] rounded-none border-x-0 border-t-0" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--glass-border)' }}>
@@ -699,6 +801,15 @@ const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt,
             isInstalled={isInstalled}
             onShowModal={onShowInstallModal}
           />
+
+          {/* OS Indicator */}
+          <div 
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+            title={osInfo.name}
+          >
+            <OSIcon os={osInfo.os} className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{osInfo.name}</span>
+          </div>
 
           {/* Online/Offline indicator */}
           <div className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full ${

@@ -354,7 +354,7 @@ body {
   .tab-button:hover {
     color: var(--text-primary);
     background: var(--bg-tertiary);
-  }
+}
 
   .tab-button.active {
     color: var(--accent);

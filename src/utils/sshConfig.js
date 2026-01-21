@@ -257,6 +257,108 @@ export const downloadAsFile = (content, filename) => {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Generate the OffGrid SSH config filename
+ * @param {string} serverName - Server name
+ * @returns {string} Filename in format config.offgrid.servername
+ */
+export const generateSSHConfigFilename = (serverName) => {
+  const sanitizedName = serverName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  return `config.offgrid.${sanitizedName}`
+}
+
+/**
+ * Check if File System Access API is supported
+ * @returns {boolean}
+ */
+export const isFileSystemAccessSupported = () => {
+  return 'showSaveFilePicker' in window
+}
+
+/**
+ * Save SSH config to file using File System Access API
+ * Falls back to download if not supported
+ * @param {string} content - SSH config content
+ * @param {string} serverName - Server name for filename
+ * @param {string} suggestedPath - Suggested path (for display purposes)
+ * @returns {Promise<{success: boolean, method: string, filename?: string, error?: string}>}
+ */
+export const saveSSHConfigToFile = async (content, serverName, suggestedPath = '~/.ssh/') => {
+  const filename = generateSSHConfigFilename(serverName)
+  
+  // Try File System Access API first
+  if (isFileSystemAccessSupported()) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'SSH Config File',
+          accept: { 'text/plain': [''] } // No extension
+        }]
+      })
+      
+      const writable = await handle.createWritable()
+      await writable.write(content)
+      await writable.close()
+      
+      return {
+        success: true,
+        method: 'filesystem',
+        filename: handle.name
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return { success: false, method: 'cancelled', error: 'User cancelled' }
+      }
+      // Fall through to download method
+    }
+  }
+  
+  // Fallback to download
+  downloadAsFile(content, filename)
+  return {
+    success: true,
+    method: 'download',
+    filename
+  }
+}
+
+/**
+ * Get instructions for including the OffGrid config file in main SSH config
+ * @param {string} filename - The OffGrid config filename
+ * @returns {Object} Instructions for each OS
+ */
+export const getIncludeInstructions = (filename) => {
+  return {
+    linux: {
+      title: 'Linux/macOS',
+      steps: [
+        `Move the file to your SSH directory:`,
+        `mv ~/Downloads/${filename} ~/.ssh/${filename}`,
+        ``,
+        `Add this line to ~/.ssh/config:`,
+        `Include ~/.ssh/${filename}`,
+        ``,
+        `Set correct permissions:`,
+        `chmod 600 ~/.ssh/${filename}`
+      ]
+    },
+    windows: {
+      title: 'Windows',
+      steps: [
+        `Move the file to your SSH directory:`,
+        `%USERPROFILE%\\.ssh\\${filename}`,
+        ``,
+        `Add this line to %USERPROFILE%\\.ssh\\config:`,
+        `Include ${filename}`,
+      ]
+    }
+  }
+}
+
 export default {
   generateSSHConfigEntry,
   generateSSHConfig,
@@ -264,6 +366,10 @@ export default {
   getSSHConfigInstructions,
   generateSSHConfigScript,
   parseSSHConfig,
-  downloadAsFile
+  downloadAsFile,
+  generateSSHConfigFilename,
+  isFileSystemAccessSupported,
+  saveSSHConfigToFile,
+  getIncludeInstructions
 }
 
