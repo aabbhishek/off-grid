@@ -8,6 +8,8 @@ This document provides context for AI assistants working on the OffGrid codebase
 
 **Core Principle**: Zero data transmission. Everything runs in the browser using Web APIs.
 
+**Live URL**: https://off-grid.darkpkt.cloud (Custom domain hosted on GitHub Pages)
+
 ## Tech Stack
 
 | Technology | Purpose |
@@ -43,7 +45,7 @@ off-grid/
 │   │   ├── BootLoader.jsx   # Boot animation on first load
 │   │   └── vault/           # Vault-specific components
 │   └── utils/               # Utility functions
-├── public/                  # Static assets (favicon, PWA icons)
+├── public/                  # Static assets (favicon, PWA icons, CNAME)
 ├── index.html               # HTML entry point
 ├── vite.config.js           # Vite configuration (includes PWA plugin)
 ├── tailwind.config.js       # Tailwind configuration
@@ -350,6 +352,11 @@ getIncludeInstructions(filename) → {linux: {...}, windows: {...}}
 ### Auto Release Workflow
 
 Located in `.github/workflows/deploy.yml`. Handles deployment and semantic versioning.
+
+**Deployment:**
+- Hosted on GitHub Pages with custom domain: `off-grid.darkpkt.cloud`
+- CNAME file in `public/` directory for custom domain configuration
+- Base path is `/` (root) since using custom domain
 
 **Version format:** `Major.Minor.Patch` (e.g., `1.5.3`)
 

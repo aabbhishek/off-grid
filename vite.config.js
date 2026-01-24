@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/off-grid/',
+  base: '/',
   plugins: [
     react(),
     VitePWA({
@@ -17,30 +17,30 @@ export default defineConfig({
         background_color: '#0a0a14',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/off-grid/',
-        scope: '/off-grid/',
+        start_url: '/',
+        scope: '/',
         categories: ['developer', 'utilities', 'productivity'],
         icons: [
           {
-            src: '/off-grid/favicon.svg',
+            src: '/favicon.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any'
           },
           {
-            src: '/off-grid/icon-192.png',
+            src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/off-grid/icon-512.png',
+            src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/off-grid/icon-maskable-512.png',
+            src: '/icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'

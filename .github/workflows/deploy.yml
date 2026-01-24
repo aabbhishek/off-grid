@@ -177,7 +177,7 @@ jobs:
           echo "---" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "## 🚀 Deployment Info" >> $GITHUB_OUTPUT
-          echo "- **Live URL:** https://aabbhishek.github.io/off-grid" >> $GITHUB_OUTPUT
+          echo "- **Live URL:** https://off-grid.darkpkt.cloud" >> $GITHUB_OUTPUT
           echo "- **Build Date:** ${{ steps.date.outputs.date }}" >> $GITHUB_OUTPUT
           echo "- **Node Version:** 20" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
