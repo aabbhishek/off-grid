@@ -19,10 +19,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-BWlFwdle.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DsNobCal.css">
+    <script type="module" crossorigin src="/assets/index-BCSHYA03.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CKK2_Zgh.css">
   <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
+    <!-- Cloudflare Web Analytics - Controlled by Ghost Mode -->
+    <script>
+      (function() {
+        // Check if ghost mode is enabled
+        const ghostMode = localStorage.getItem('offgrid-ghostmode') === 'true';
+        if (!ghostMode) {
+          // Load Cloudflare analytics only if ghost mode is disabled
+          var script = document.createElement('script');
+          script.defer = true;
+          script.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+          script.setAttribute('data-cf-beacon', '{"token": "5777f7fc9bcc4a7d947b5e4e2406ce93"}');
+          script.id = 'cf-analytics';
+          document.body.appendChild(script);
+        }
+      })();
+    </script>
   </body>
 </html>
