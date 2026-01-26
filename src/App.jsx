@@ -7,7 +7,7 @@ import {
   ChevronDown, Zap, Menu, X, Home, Sun, Moon,
   Palette, Check, ShieldCheck, Download, Smartphone,
   Monitor, Share2, MoreVertical, Plus, ExternalLink,
-  Lock, FileText, KeySquare
+  Lock, FileText, KeySquare, Ghost, Eye, EyeOff
 } from 'lucide-react'
 
 // Import components
@@ -23,6 +23,7 @@ import UUIDGenerator from './pages/UUIDGenerator'
 import SSLToolkit from './pages/SSLToolkit'
 import LogAnalyzer from './pages/LogAnalyzer'
 import LocalVault from './pages/LocalVault'
+import Privacy from './pages/Privacy'
 
 // Context for global state
 export const AppContext = createContext()
@@ -433,6 +434,7 @@ const AccentPicker = ({ accent, setAccent }) => {
 // Privacy Badge component
 const PrivacyBadge = () => {
   const [expanded, setExpanded] = useState(false)
+  const { ghostMode, setGhostMode } = useApp()
 
   return (
     <div className="relative z-[100]">
@@ -477,8 +479,8 @@ const PrivacyBadge = () => {
                   No data sent to servers
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  No analytics or tracking
+                  <span className={`w-1.5 h-1.5 rounded-full ${ghostMode ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                  {ghostMode ? 'Analytics disabled (Ghost Mode)' : 'Minimal analytics (Cloudflare)'}
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -489,6 +491,18 @@ const PrivacyBadge = () => {
                   Open source & verifiable
                 </li>
               </ul>
+              
+              {/* Ghost Mode Quick Toggle */}
+              {!ghostMode && (
+                <button
+                  onClick={() => setGhostMode(true)}
+                  className="mt-3 w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20 text-xs text-[var(--text-secondary)] transition-colors"
+                >
+                  <Ghost className="w-3.5 h-3.5" />
+                  Enable Ghost Mode for full privacy
+                </button>
+              )}
+              
               <a 
                 href="https://github.com/aabbhishek/off-grid" 
                 target="_blank" 
@@ -533,7 +547,7 @@ const toolDescriptions = {
 }
 
 // Sidebar component
-const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, isInstalled, onShowInstallModal }) => {
+const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, isInstalled, onShowInstallModal, onGhostActivate }) => {
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef(null)
@@ -672,13 +686,14 @@ const Sidebar = ({ isOpen, setIsOpen, deferredPrompt, isInstalled, onShowInstall
           )}
         </nav>
 
-        {/* Install App & Dev Mode Toggle */}
+        {/* Install App, Ghost Mode & Dev Mode Toggle */}
         <div className="p-4 border-t border-[var(--border-color)] space-y-2">
           <InstallButton 
             deferredPrompt={deferredPrompt}
             isInstalled={isInstalled}
             onShowModal={onShowInstallModal}
           />
+          <GhostModeToggle onActivate={onGhostActivate} />
           <DevModeToggle />
         </div>
       </motion.aside>
@@ -703,6 +718,207 @@ const DevModeToggle = () => {
       </div>
       <div className={`toggle-switch ${devMode ? 'active' : ''}`}></div>
     </button>
+  )
+}
+
+// Ghost Mode Activation Animation (Full-screen overlay)
+const GhostModeAnimation = ({ isActivating, onComplete }) => {
+  useEffect(() => {
+    if (isActivating) {
+      const timer = setTimeout(onComplete, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [isActivating, onComplete])
+
+  return (
+    <AnimatePresence>
+      {isActivating && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.95) 100%)' }}
+        >
+          {/* Ripple effects */}
+          {[...Array(3)].map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ scale: 0, opacity: 0.8 }}
+              animate={{ 
+                scale: [0, 3, 5],
+                opacity: [0.8, 0.4, 0]
+              }}
+              transition={{
+                duration: 2,
+                delay: i * 0.3,
+                ease: "easeOut"
+              }}
+              className="absolute w-32 h-32 rounded-full border-2"
+              style={{ borderColor: 'var(--accent)' }}
+            />
+          ))}
+
+          {/* Ghost icon with glow */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ 
+              scale: [0, 1.5, 1],
+              rotate: [-180, 20, 0]
+            }}
+            transition={{ 
+              duration: 0.8,
+              ease: [0.34, 1.56, 0.64, 1]
+            }}
+            className="relative"
+          >
+            {/* Glow layers */}
+            <motion.div
+              animate={{
+                boxShadow: [
+                  '0 0 20px var(--accent), 0 0 40px var(--accent), 0 0 60px var(--accent)',
+                  '0 0 40px var(--accent), 0 0 80px var(--accent), 0 0 120px var(--accent)',
+                  '0 0 20px var(--accent), 0 0 40px var(--accent), 0 0 60px var(--accent)'
+                ]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="absolute inset-0 rounded-full blur-xl"
+              style={{ background: 'var(--accent)', opacity: 0.3 }}
+            />
+            
+            <motion.div
+              animate={{ 
+                y: [0, -10, 0],
+                filter: [
+                  'drop-shadow(0 0 20px var(--accent))',
+                  'drop-shadow(0 0 40px var(--accent))',
+                  'drop-shadow(0 0 20px var(--accent))'
+                ]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="relative z-10"
+            >
+              <Ghost className="w-24 h-24" style={{ color: 'var(--accent)' }} />
+            </motion.div>
+          </motion.div>
+
+          {/* Text */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="absolute bottom-1/3 text-center"
+          >
+            <motion.h2 
+              className="text-3xl font-bold mb-2"
+              style={{ color: 'var(--accent)' }}
+              animate={{
+                textShadow: [
+                  '0 0 10px var(--accent)',
+                  '0 0 20px var(--accent)',
+                  '0 0 10px var(--accent)'
+                ]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              GHOST MODE ACTIVATED
+            </motion.h2>
+            <motion.p 
+              className="text-[var(--text-secondary)] text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              Analytics disabled • You're invisible
+            </motion.p>
+          </motion.div>
+
+          {/* Floating particles */}
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={`particle-${i}`}
+              initial={{ 
+                x: Math.random() * window.innerWidth - window.innerWidth / 2,
+                y: window.innerHeight / 2,
+                opacity: 0
+              }}
+              animate={{
+                y: -window.innerHeight,
+                opacity: [0, 1, 0],
+                scale: [0, 1, 0]
+              }}
+              transition={{
+                duration: 2 + Math.random(),
+                delay: Math.random() * 0.5,
+                ease: "easeOut"
+              }}
+              className="absolute w-2 h-2 rounded-full"
+              style={{ background: 'var(--accent)' }}
+            />
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// Ghost Mode Toggle (Sidebar)
+const GhostModeToggle = ({ onActivate }) => {
+  const { ghostMode, setGhostMode } = useApp()
+
+  const handleToggle = () => {
+    if (!ghostMode) {
+      // Activating ghost mode - show animation
+      onActivate()
+    }
+    setGhostMode(!ghostMode)
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 ${
+        ghostMode 
+          ? 'bg-[var(--accent)]/10 border border-[var(--accent)]/30' 
+          : 'hover:bg-[var(--bg-tertiary)]'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Ghost className={`w-4 h-4 ${ghostMode ? 'accent-text' : 'text-[var(--text-tertiary)]'}`} />
+        <span className={`text-sm ${ghostMode ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`}>
+          Ghost Mode
+        </span>
+        {ghostMode && (
+          <motion.span 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent)]/20 accent-text"
+          >
+            Private
+          </motion.span>
+        )}
+      </div>
+      <div className={`toggle-switch ${ghostMode ? 'active' : ''}`}></div>
+    </button>
+  )
+}
+
+// Ghost Mode Badge for Header
+const GhostIndicator = () => {
+  const { ghostMode } = useApp()
+
+  if (!ghostMode) return null
+
+  return (
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0, opacity: 0 }}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[var(--accent)] text-white"
+    >
+      <Ghost className="w-3.5 h-3.5" />
+      <span className="text-xs font-medium hidden sm:inline">Ghost</span>
+    </motion.div>
   )
 }
 
@@ -802,6 +1018,11 @@ const Header = ({ setIsOpen, theme, setTheme, accent, setAccent, deferredPrompt,
             onShowModal={onShowInstallModal}
           />
 
+          {/* Ghost Mode Indicator */}
+          <AnimatePresence>
+            <GhostIndicator />
+          </AnimatePresence>
+
           {/* OS Indicator */}
           <div 
             className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
@@ -856,6 +1077,13 @@ function App() {
     const saved = localStorage.getItem('offgrid-devmode')
     return saved === 'true'
   })
+
+  const [ghostMode, setGhostMode] = useState(() => {
+    const saved = localStorage.getItem('offgrid-ghostmode')
+    return saved === 'true'
+  })
+  
+  const [ghostActivating, setGhostActivating] = useState(false)
   
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('offgrid-theme')
@@ -900,6 +1128,31 @@ function App() {
   useEffect(() => {
     localStorage.setItem('offgrid-devmode', devMode)
   }, [devMode])
+
+  // Save ghost mode preference and manage analytics
+  useEffect(() => {
+    localStorage.setItem('offgrid-ghostmode', ghostMode)
+    
+    // Manage Cloudflare analytics script
+    const existingScript = document.getElementById('cf-analytics')
+    
+    if (ghostMode) {
+      // Remove analytics script if ghost mode is enabled
+      if (existingScript) {
+        existingScript.remove()
+      }
+    } else {
+      // Add analytics script if ghost mode is disabled and script doesn't exist
+      if (!existingScript) {
+        const script = document.createElement('script')
+        script.defer = true
+        script.src = 'https://static.cloudflareinsights.com/beacon.min.js'
+        script.setAttribute('data-cf-beacon', '{"token": "5777f7fc9bcc4a7d947b5e4e2406ce93"}')
+        script.id = 'cf-analytics'
+        document.body.appendChild(script)
+      }
+    }
+  }, [ghostMode])
 
   // Online/offline detection
   useEffect(() => {
@@ -953,6 +1206,15 @@ function App() {
         showToast(devMode ? 'Dev Mode disabled' : 'Dev Mode enabled')
       }
       
+      // Ghost mode toggle
+      if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.target.matches('input, textarea')) {
+        if (!ghostMode) {
+          handleGhostActivate()
+        }
+        setGhostMode(prev => !prev)
+        showToast(ghostMode ? 'Ghost Mode disabled — Analytics resumed' : 'Ghost Mode enabled — You\'re invisible')
+      }
+      
       // Theme toggle
       if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.target.matches('input, textarea')) {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark')
@@ -976,7 +1238,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [devMode])
+  }, [devMode, ghostMode])
 
   const showToast = (message) => {
     setToast(message)
@@ -992,12 +1254,23 @@ function App() {
     }
   }
 
+  // Handle ghost mode activation animation
+  const handleGhostActivate = () => {
+    setGhostActivating(true)
+  }
+
   return (
-    <AppContext.Provider value={{ devMode, setDevMode, isOnline, showToast, copyToClipboard, theme, accent }}>
+    <AppContext.Provider value={{ devMode, setDevMode, ghostMode, setGhostMode, isOnline, showToast, copyToClipboard, theme, accent }}>
       {/* Boot Loader */}
       <AnimatePresence>
         {isBooting && <BootLoader onComplete={handleBootComplete} />}
       </AnimatePresence>
+
+      {/* Ghost Mode Activation Animation */}
+      <GhostModeAnimation 
+        isActivating={ghostActivating} 
+        onComplete={() => setGhostActivating(false)} 
+      />
 
       {/* Main App */}
       {!isBooting && (
@@ -1014,6 +1287,7 @@ function App() {
               deferredPrompt={deferredPrompt}
               isInstalled={isInstalled}
               onShowInstallModal={() => setInstallModalOpen(true)}
+              onGhostActivate={handleGhostActivate}
             />
             
             {/* Main content with left margin on desktop for fixed sidebar */}
@@ -1041,25 +1315,53 @@ function App() {
                     <Route path="/ssl/*" element={<SSLToolkit />} />
                     <Route path="/logs" element={<LogAnalyzer />} />
                     <Route path="/vault" element={<LocalVault />} />
+                    <Route path="/privacy" element={<Privacy />} />
                   </Routes>
                 </AnimatePresence>
               </main>
 
             {/* Footer */}
-            <footer className="p-4 text-center text-xs text-[var(--text-tertiary)]">
-              <p className="flex items-center justify-center gap-2">
-                <span>OffGrid — Your data never leaves your browser</span>
-                <span>•</span>
-                <a 
-                  href="https://github.com/aabbhishek/off-grid" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
-                >
-                  <Github className="w-3 h-3" />
-                  GitHub
-                </a>
-              </p>
+            <footer className="py-8 px-4 border-t border-[var(--border-color)] mt-8">
+              <div className="max-w-2xl mx-auto text-center space-y-4">
+                {/* Tagline with India flag */}
+                <div className="flex items-center justify-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <span>Off the grid, on the map —</span>
+                  <span className="font-medium text-[var(--text-primary)]">India</span>
+                  <span className="text-lg">🇮🇳</span>
+                </div>
+                
+                {/* Sanskrit Quote */}
+                <div className="space-y-1">
+                  <p className="text-base text-[var(--accent)] font-medium" style={{ fontFamily: 'serif' }}>
+                    तमसो मा ज्योतिर्गमय
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] italic">
+                    "From darkness, lead me to light"
+                  </p>
+                </div>
+                
+                {/* Links & Copyright */}
+                <div className="flex items-center justify-center gap-3 text-xs text-[var(--text-tertiary)] pt-2">
+                  <span>© {new Date().getFullYear()} OffGrid</span>
+                  <span>•</span>
+                  <NavLink 
+                    to="/privacy"
+                    className="hover:text-[var(--accent)] transition-colors"
+                  >
+                    Privacy-First
+                  </NavLink>
+                  <span>•</span>
+                  <a 
+                    href="https://github.com/aabbhishek/off-grid" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
+                  >
+                    <Github className="w-3 h-3" />
+                    Open Source
+                  </a>
+                </div>
+              </div>
             </footer>
             </div>
           </div>

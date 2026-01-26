@@ -40,7 +40,8 @@ off-grid/
 │   │   ├── UUIDGenerator.jsx # UUID v1/v4/v7 generation
 │   │   ├── SSLToolkit.jsx   # SSL/TLS certificate tools
 │   │   ├── LogAnalyzer.jsx  # Log parsing and analysis
-│   │   └── LocalVault.jsx   # Encrypted credential storage
+│   │   ├── LocalVault.jsx   # Encrypted credential storage
+│   │   └── Privacy.jsx      # Privacy & analytics info page
 │   ├── components/          # Shared components
 │   │   ├── BootLoader.jsx   # Boot animation on first load
 │   │   └── vault/           # Vault-specific components
@@ -395,6 +396,69 @@ The header displays the user's operating system with an icon.
 ### Browser Detection
 
 **Function:** `getBrowserInfo()` — Returns browser name and platform (ios/android/desktop)
+
+## Ghost Mode & Analytics
+
+### Cloudflare Analytics
+
+**Token:** `5777f7fc9bcc4a7d947b5e4e2406ce93`
+
+Analytics script is loaded conditionally based on Ghost Mode state:
+- Initial load: Checks `localStorage.getItem('offgrid-ghostmode')` in `index.html`
+- If ghost mode is enabled, script never loads
+- Runtime: Managed by `useEffect` in `App.jsx` — adds/removes script dynamically
+
+**What is tracked (when Ghost Mode OFF):**
+- Page views (no user identification)
+- Country (from IP, not stored)
+- Device type (desktop/mobile/tablet)
+- Browser type (no fingerprinting)
+
+**What is never tracked:**
+- Passwords or credentials
+- Content processed (JWTs, JSON, logs)
+- Personal information
+- Cookies or cross-site tracking
+
+### Ghost Mode
+
+Privacy-focused feature that completely disables all analytics tracking.
+
+**State Management:**
+- Stored in `localStorage` as `offgrid-ghostmode`
+- Managed via `AppContext` (`ghostMode`, `setGhostMode`)
+- Keyboard shortcut: Press `g` to toggle
+
+**Components:**
+1. **`GhostModeToggle`** — Sidebar toggle with "Private" badge when active
+2. **`GhostIndicator`** — Simple badge in header with ghost icon (primary accent color)
+3. **`GhostModeAnimation`** — Full-screen activation animation with:
+   - Ripple effects (3 expanding circles)
+   - Floating ghost icon with glow
+   - Floating particles rising upward
+   - "GHOST MODE ACTIVATED" text
+
+**When Enabled:**
+- Cloudflare analytics script is removed from DOM
+- Ghost badge appears in header (solid accent color background)
+- Sidebar toggle shows "Private" badge
+- Analytics never load on page refresh
+
+### Privacy Page
+
+Located at `/privacy` — explains tracking and Ghost Mode.
+
+**Sections:**
+1. **Ghost Mode Status Card** — Shows current status with toggle button
+2. **What We Track** — Page views, country, device type (Cloudflare)
+3. **What We Never Track** — Passwords, content, personal info
+4. **How Ghost Mode Works** — Step-by-step explanation
+5. **About Cloudflare** — Why we chose it, privacy features, external links
+
+**Links:**
+- Footer link to `/privacy`
+- External link to Cloudflare Web Analytics info
+- External link to Cloudflare Privacy Policy
 
 ## Log Analyzer
 

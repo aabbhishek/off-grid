@@ -18,6 +18,11 @@ const bootSequence = [
   { text: '║            Privacy-First Developer Toolkit               ║', delay: 30 },
   { text: '║                     v1.0.0                                ║', delay: 30 },
   { text: '║                                                          ║', delay: 30 },
+  { text: '║              तमसो मा ज्योतिर्गमय                            ║', delay: 30, sanskrit: true },
+  { text: '║         "From darkness, lead me to light"                 ║', delay: 30 },
+  { text: '║                                                          ║', delay: 30 },
+  { text: '║                  Made in India 🇮🇳                         ║', delay: 30 },
+  { text: '║                                                          ║', delay: 30 },
   { text: '╚══════════════════════════════════════════════════════════╝', delay: 50 },
   { text: '', delay: 100 },
   { text: 'Loading OFFGRID kernel...', delay: 200 },
@@ -144,6 +149,12 @@ export default function BootLoader({ onComplete }) {
                     <span className="text-red-500">[FAILED]</span>
                     <span className="text-red-400">{line.text.replace('[FAILED]', '')}</span>
                   </span>
+                ) : line.sanskrit ? (
+                  <span className="text-amber-400">{line.text}</span>
+                ) : line.text.includes('"From darkness') ? (
+                  <span className="text-amber-300/70">{line.text}</span>
+                ) : line.text.includes('Made in India') ? (
+                  <span className="text-orange-400">{line.text}</span>
                 ) : line.text.includes('═') || line.text.includes('║') || line.text.includes('╔') || line.text.includes('╚') || line.text.includes('█') ? (
                   <span className="text-cyan-400">{line.text}</span>
                 ) : line.text.includes('→') ? (

@@ -82,8 +82,8 @@ const features = [
   },
   {
     icon: Eye,
-    title: 'No Tracking',
-    description: 'No analytics, no cookies, no fingerprinting. Your privacy is absolute.',
+    title: 'Ghost Mode',
+    description: 'Enable Ghost Mode for zero analytics. Press G or toggle in sidebar for complete privacy.',
     color: 'text-purple-500'
   },
   {
@@ -169,7 +169,7 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-500" />
-            <span>No analytics</span>
+            <span>Ghost Mode for privacy</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-500" />

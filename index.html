@@ -23,5 +23,21 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <!-- Cloudflare Web Analytics - Controlled by Ghost Mode -->
+    <script>
+      (function() {
+        // Check if ghost mode is enabled
+        const ghostMode = localStorage.getItem('offgrid-ghostmode') === 'true';
+        if (!ghostMode) {
+          // Load Cloudflare analytics only if ghost mode is disabled
+          var script = document.createElement('script');
+          script.defer = true;
+          script.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+          script.setAttribute('data-cf-beacon', '{"token": "5777f7fc9bcc4a7d947b5e4e2406ce93"}');
+          script.id = 'cf-analytics';
+          document.body.appendChild(script);
+        }
+      })();
+    </script>
   </body>
 </html>
