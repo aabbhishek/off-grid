@@ -18,8 +18,9 @@ const bootSequence = [
   { text: '║            Privacy-First Developer Toolkit               ║', delay: 30 },
   { text: '║                     v1.0.0                                ║', delay: 30 },
   { text: '║                                                          ║', delay: 30 },
-  { text: '║              तमसो मा ज्योतिर्गमय                            ║', delay: 30, sanskrit: true },
-  { text: '║         "From darkness, lead me to light"                 ║', delay: 30 },
+  { text: '║       विद्या ददाति विनयं विनयाद् याति पात्रताम्              ║', delay: 30, sanskrit: true },
+  { text: '║             (Vidya Dadati Vinayam)                        ║', delay: 30, transliteration: true },
+  { text: '║           "Knowledge gives humility"                      ║', delay: 30 },
   { text: '║                                                          ║', delay: 30 },
   { text: '║                  Made in India 🇮🇳                         ║', delay: 30 },
   { text: '║                                                          ║', delay: 30 },
@@ -151,7 +152,9 @@ export default function BootLoader({ onComplete }) {
                   </span>
                 ) : line.sanskrit ? (
                   <span className="text-amber-400">{line.text}</span>
-                ) : line.text.includes('"From darkness') ? (
+                ) : line.transliteration ? (
+                  <span className="text-amber-500/80">{line.text}</span>
+                ) : line.text.includes('"Knowledge gives') ? (
                   <span className="text-amber-300/70">{line.text}</span>
                 ) : line.text.includes('Made in India') ? (
                   <span className="text-orange-400">{line.text}</span>

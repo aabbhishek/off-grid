@@ -1333,10 +1333,13 @@ function App() {
                 {/* Sanskrit Quote */}
                 <div className="space-y-1">
                   <p className="text-base text-[var(--accent)] font-medium" style={{ fontFamily: 'serif' }}>
-                    तमसो मा ज्योतिर्गमय
+                    विद्या ददाति विनयं विनयाद् याति पात्रताम्
+                  </p>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    (Vidya Dadati Vinayam)
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] italic">
-                    "From darkness, lead me to light"
+                    "Knowledge gives humility"
                   </p>
                 </div>
                 
